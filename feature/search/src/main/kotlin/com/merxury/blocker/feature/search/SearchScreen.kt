@@ -25,18 +25,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.windowInsetsTopHeight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration.Short
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -54,9 +51,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.merxury.blocker.core.analytics.LocalAnalyticsHelper
 import com.merxury.blocker.core.designsystem.component.BlockerErrorAlertDialog
 import com.merxury.blocker.core.designsystem.component.BlockerWarningAlertDialog
+import com.merxury.blocker.core.designsystem.component.PreviewThemes
 import com.merxury.blocker.core.designsystem.component.SnackbarHostState
-import com.merxury.blocker.core.designsystem.component.ThemePreviews
-import com.merxury.blocker.core.designsystem.component.scrollbar.FastScrollbar
+import com.merxury.blocker.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.merxury.blocker.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.merxury.blocker.core.designsystem.component.scrollbar.scrollbarState
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
@@ -66,7 +63,7 @@ import com.merxury.blocker.core.model.data.AppItem
 import com.merxury.blocker.core.model.data.FilteredComponent
 import com.merxury.blocker.core.model.data.GeneralRule
 import com.merxury.blocker.core.ui.AppDetailTabs
-import com.merxury.blocker.core.ui.DevicePreviews
+import com.merxury.blocker.core.ui.PreviewDevices
 import com.merxury.blocker.core.ui.SearchScreenTabs
 import com.merxury.blocker.core.ui.TabState
 import com.merxury.blocker.core.ui.TrackScreenViewEvent
@@ -98,8 +95,9 @@ import com.merxury.blocker.core.ui.R.string as uistring
 @Composable
 fun SearchRoute(
     snackbarHostState: SnackbarHostState,
+    highlightSelectedItem: Boolean = false,
     navigateToAppDetail: (String, AppDetailTabs, List<String>) -> Unit = { _, _, _ -> },
-    navigateToRuleDetail: (String) -> Unit,
+    navigateToRuleDetail: (String) -> Unit = { _ -> },
     viewModel: SearchViewModel = hiltViewModel(),
 ) {
     val localSearchUiState by viewModel.localSearchUiState.collectAsStateWithLifecycle()
@@ -113,10 +111,10 @@ fun SearchRoute(
         tabState = tabState,
         localSearchUiState = localSearchUiState,
         switchTab = viewModel::switchTab,
-        onSearchTriggered = { keyword ->
+        onSearchTrigger = { keyword ->
             viewModel.search(keyword)
         },
-        onSearchQueryChanged = { keyword ->
+        onSearchQueryChange = { keyword ->
             viewModel.search(keyword)
         },
         onSelectAll = viewModel::selectAll,
@@ -128,10 +126,16 @@ fun SearchRoute(
             handleEnableAppClick(context, viewModel, scope, snackbarHostState)
         },
         searchUiState = selectUiState,
+        highlightSelectedItem = highlightSelectedItem,
         switchSelectedMode = viewModel::switchSelectedMode,
         onSelect = viewModel::selectItem,
         navigateToAppDetail = navigateToAppDetail,
-        navigateToRuleDetail = navigateToRuleDetail,
+        onAppClick = viewModel::onAppClick,
+        onComponentClick = viewModel::onComponentClick,
+        navigateToRuleDetail = {
+            viewModel.onRuleClick(it)
+            navigateToRuleDetail(it)
+        },
         onClearCacheClick = viewModel::clearCache,
         onClearDataClick = viewModel::clearData,
         onForceStopClick = viewModel::forceStop,
@@ -218,13 +222,16 @@ private fun handleBlockAllClick(
 
 @Composable
 fun SearchScreen(
-    modifier: Modifier = Modifier,
     tabState: TabState<SearchScreenTabs>,
     localSearchUiState: LocalSearchUiState,
     searchUiState: SearchUiState,
+    modifier: Modifier = Modifier,
+    highlightSelectedItem: Boolean = false,
+    onAppClick: (String) -> Unit = { },
+    onComponentClick: (String) -> Unit = { },
     switchTab: (SearchScreenTabs) -> Unit = {},
-    onSearchQueryChanged: (String) -> Unit = {},
-    onSearchTriggered: (String) -> Unit = {},
+    onSearchQueryChange: (String) -> Unit = {},
+    onSearchTrigger: (String) -> Unit = {},
     onSelectAll: () -> Unit = {},
     onBlockAll: () -> Unit = {},
     onEnableAll: () -> Unit = {},
@@ -240,59 +247,50 @@ fun SearchScreen(
     onEnableClick: (String) -> Unit = { },
     onDisableClick: (String) -> Unit = { },
 ) {
-    Scaffold(
-        topBar = {
-            TopBar(
-                searchUiState = searchUiState,
-                onSearchQueryChanged = onSearchQueryChanged,
-                onSearchTriggered = onSearchTriggered,
-                onNavigationClick = { switchSelectedMode(false) },
-                onSelectAll = onSelectAll,
-                onBlockAll = onBlockAll,
-                onEnableAll = onEnableAll,
-                modifier = Modifier.testTag("blockerTopAppBar"),
-            )
-        },
-    ) { padding ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(
-                        WindowInsetsSides.Horizontal,
-                    ),
-                ),
-        ) {
-            when (localSearchUiState) {
-                is Idle -> EmptyScreen(textRes = string.feature_search_no_search_result)
-                is Loading -> SearchingScreen()
-                is Error -> ErrorScreen(localSearchUiState.uiMessage)
-                is Initializing ->
-                    InitializingScreen(localSearchUiState.processingName)
+    Column(modifier = modifier) {
+        Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
+        TopBar(
+            searchUiState = searchUiState,
+            onSearchQueryChange = onSearchQueryChange,
+            onSearchTrigger = onSearchTrigger,
+            onNavigationClick = { switchSelectedMode(false) },
+            onSelectAll = onSelectAll,
+            onBlockAll = onBlockAll,
+            onEnableAll = onEnableAll,
+            modifier = Modifier.testTag("blockerTopAppBar"),
+        )
+        when (localSearchUiState) {
+            is Idle -> EmptyScreen(textRes = string.feature_search_no_search_result)
+            is Loading -> SearchingScreen()
+            is Error -> ErrorScreen(localSearchUiState.uiMessage)
+            is Initializing ->
+                InitializingScreen(localSearchUiState.processingName)
 
-                is Success -> SearchResultScreen(
-                    modifier = modifier,
-                    tabState = tabState,
-                    switchTab = switchTab,
-                    localSearchUiState = localSearchUiState,
-                    searchUiState = searchUiState,
-                    switchSelectedMode = switchSelectedMode,
-                    onSelect = onSelect,
-                    onDeselect = onDeselect,
-                    navigateToAppDetail = navigateToAppDetail,
-                    navigateToRuleDetail = navigateToRuleDetail,
-                    appList = localSearchUiState.appTabUiState.list,
-                    onClearCacheClick = onClearCacheClick,
-                    onClearDataClick = onClearDataClick,
-                    onForceStopClick = onForceStopClick,
-                    onUninstallClick = onUninstallClick,
-                    onEnableClick = onEnableClick,
-                    onDisableClick = onDisableClick,
-                )
-            }
+            is Success -> SearchResultScreen(
+                tabState = tabState,
+                highlightSelectedItem = highlightSelectedItem,
+                switchTab = switchTab,
+                localSearchUiState = localSearchUiState,
+                searchUiState = searchUiState,
+                switchSelectedMode = switchSelectedMode,
+                onSelect = onSelect,
+                onDeselect = onDeselect,
+                onAppClick = onAppClick,
+                onComponentClick = onComponentClick,
+                navigateToAppDetail = navigateToAppDetail,
+                navigateToRuleDetail = navigateToRuleDetail,
+                appList = localSearchUiState.appTabUiState.list,
+                onClearCacheClick = onClearCacheClick,
+                onClearDataClick = onClearDataClick,
+                onForceStopClick = onForceStopClick,
+                onUninstallClick = onUninstallClick,
+                onEnableClick = onEnableClick,
+                onDisableClick = onDisableClick,
+            )
         }
+        Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
     }
+
     BackHandler(enabled = searchUiState.isSelectedMode) {
         switchSelectedMode(false)
     }
@@ -301,19 +299,20 @@ fun SearchScreen(
 
 @Composable
 fun TopBar(
-    modifier: Modifier = Modifier,
     searchUiState: SearchUiState,
-    onSearchQueryChanged: (String) -> Unit,
-    onSearchTriggered: (String) -> Unit,
-    onNavigationClick: () -> Unit,
-    onSelectAll: () -> Unit,
-    onBlockAll: () -> Unit,
-    onEnableAll: () -> Unit,
+    modifier: Modifier = Modifier,
+    onSearchQueryChange: (String) -> Unit = { _ -> },
+    onSearchTrigger: (String) -> Unit = { _ -> },
+    onNavigationClick: () -> Unit = {},
+    onSelectAll: () -> Unit = {},
+    onBlockAll: () -> Unit = {},
+    onEnableAll: () -> Unit = {},
 ) {
     Crossfade(
         searchUiState.isSelectedMode,
         animationSpec = tween(500),
         label = "topBar",
+        modifier = modifier,
     ) { targetState ->
         if (targetState) {
             SelectedAppTopBar(
@@ -327,10 +326,9 @@ fun TopBar(
             )
         } else {
             SearchBar(
-                modifier = modifier,
                 searchQuery = searchUiState.keyword,
-                onSearchQueryChanged = onSearchQueryChanged,
-                onSearchTriggered = onSearchTriggered,
+                onSearchQueryChange = onSearchQueryChange,
+                onSearchTrigger = onSearchTrigger,
             )
         }
     }
@@ -338,13 +336,14 @@ fun TopBar(
 
 @Composable
 fun ComponentSearchResultContent(
-    modifier: Modifier = Modifier,
     searchUiState: SearchUiState,
     componentTabUiState: ComponentTabUiState,
-    switchSelectedMode: (Boolean) -> Unit,
-    onSelect: (FilteredComponent) -> Unit,
-    onDeselect: (FilteredComponent) -> Unit,
-    onComponentClick: (FilteredComponent) -> Unit,
+    modifier: Modifier = Modifier,
+    highlightSelectedApp: Boolean = false,
+    switchSelectedMode: (Boolean) -> Unit = {},
+    onSelect: (FilteredComponent) -> Unit = {},
+    onDeselect: (FilteredComponent) -> Unit = {},
+    onComponentClick: (FilteredComponent) -> Unit = {},
 ) {
     if (componentTabUiState.list.isEmpty()) {
         EmptyScreen(textRes = string.feature_search_no_search_result)
@@ -357,13 +356,15 @@ fun ComponentSearchResultContent(
     val analyticsHelper = LocalAnalyticsHelper.current
     Box(modifier.fillMaxSize()) {
         LazyColumn(
-            modifier = modifier,
             state = listState,
         ) {
             items(componentTabUiState.list, key = { it.app.packageName }) {
+                val isSelected =
+                    highlightSelectedApp && it.app.packageName == componentTabUiState.selectedPackageName
                 FilteredComponentItem(
                     items = it,
                     isSelectedMode = searchUiState.isSelectedMode,
+                    isSelected = isSelected,
                     switchSelectedMode = switchSelectedMode,
                     onSelect = onSelect,
                     onDeselect = onDeselect,
@@ -371,21 +372,21 @@ fun ComponentSearchResultContent(
                         onComponentClick(component)
                         analyticsHelper.logComponentSearchResultClicked()
                     },
-                    isSelected = searchUiState.selectedAppList.contains(it),
+                    isSelectedInSelectedMode = searchUiState.selectedAppList.contains(it),
                 )
             }
             item {
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
             }
         }
-        listState.FastScrollbar(
+        listState.DraggableScrollbar(
             modifier = Modifier
                 .fillMaxHeight()
                 .padding(horizontal = 2.dp)
                 .align(Alignment.CenterEnd),
             state = scrollbarState,
             orientation = Vertical,
-            onThumbMoved = listState.rememberDraggableScroller(
+            onThumbMove = listState.rememberDraggableScroller(
                 itemsAvailable = componentTabUiState.list.size,
             ),
         )
@@ -394,9 +395,11 @@ fun ComponentSearchResultContent(
 
 @Composable
 fun AppSearchResultContent(
-    modifier: Modifier = Modifier,
     appList: List<AppItem>,
     onClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    highlightSelectedApp: Boolean = false,
+    selectedPackageName: String? = null,
     onClearCacheClick: (String) -> Unit = { },
     onClearDataClick: (String) -> Unit = { },
     onForceStopClick: (String) -> Unit = { },
@@ -411,6 +414,8 @@ fun AppSearchResultContent(
     val analyticsHelper = LocalAnalyticsHelper.current
     AppList(
         appList = appList,
+        highlightSelectedApp = highlightSelectedApp,
+        selectedPackageName = selectedPackageName,
         onAppItemClick = { packageName ->
             onClick(packageName)
             analyticsHelper.logAppSearchResultClicked()
@@ -427,18 +432,24 @@ fun AppSearchResultContent(
 
 @Composable
 fun RuleSearchResultContent(
+    matchedRules: List<GeneralRule>,
+    unmatchedRules: List<GeneralRule>,
     modifier: Modifier = Modifier,
-    list: List<GeneralRule>,
-    onClick: (String) -> Unit,
+    highlightSelectedRule: Boolean = false,
+    selectedRuleId: String? = null,
+    onClick: (String) -> Unit = { _ -> },
 ) {
-    if (list.isEmpty()) {
+    if (matchedRules.isEmpty()) {
         EmptyScreen(textRes = string.feature_search_no_search_result)
         return
     }
     val analyticsHelper = LocalAnalyticsHelper.current
     GeneralRulesList(
         modifier = modifier.fillMaxSize(),
-        rules = list,
+        highlightSelectedRule = highlightSelectedRule,
+        selectedRuleId = selectedRuleId,
+        matchedRules = matchedRules,
+        unmatchedRules = unmatchedRules,
         onClick = { id ->
             onClick(id)
             analyticsHelper.logRuleSearchResultClicked(id)
@@ -447,8 +458,8 @@ fun RuleSearchResultContent(
 }
 
 @Composable
-@ThemePreviews
-fun SearchScreenSelectedAppPreview() {
+@PreviewThemes
+private fun SearchScreenSelectedAppPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
     val appList = AppListPreviewParameterProvider().values.first()
     val keyword = "blocker"
@@ -472,8 +483,8 @@ fun SearchScreenSelectedAppPreview() {
 }
 
 @Composable
-@DevicePreviews
-fun SearchScreenSelectedComponentPreview() {
+@PreviewDevices
+private fun SearchScreenSelectedComponentPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
     val appList = AppListPreviewParameterProvider().values.first()
     val components = ComponentListPreviewParameterProvider().values.first()
@@ -504,8 +515,8 @@ fun SearchScreenSelectedComponentPreview() {
 }
 
 @Composable
-@ThemePreviews
-fun SearchScreenSelectedRule() {
+@PreviewThemes
+private fun SearchScreenSelectedRule() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
     val ruleList = RuleListPreviewParameterProvider().values.first()
     val keyword = "blocker"
@@ -516,7 +527,7 @@ fun SearchScreenSelectedRule() {
                 localSearchUiState = Success(
                     searchKeyword = listOf(keyword),
                     ruleTabUiState = RuleTabUiState(
-                        list = ruleList,
+                        matchedRules = ruleList,
                     ),
                 ),
                 tabState = tabState[2],
@@ -529,9 +540,9 @@ fun SearchScreenSelectedRule() {
 }
 
 @Composable
-@ThemePreviews
-@DevicePreviews
-fun SearchScreenSelectedModePreview() {
+@PreviewThemes
+@PreviewDevices
+private fun SearchScreenSelectedModePreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
     val appList = AppListPreviewParameterProvider().values.first()
     val components = ComponentListPreviewParameterProvider().values.first()
@@ -575,7 +586,7 @@ fun SearchScreenSelectedModePreview() {
 
 @Composable
 @Preview
-fun SearchScreenEmptyPreview() {
+private fun SearchScreenEmptyPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
 
     BlockerTheme {
@@ -591,7 +602,7 @@ fun SearchScreenEmptyPreview() {
 
 @Composable
 @Preview
-fun SearchScreenNoResultPreview() {
+private fun SearchScreenNoResultPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
     val keyword = "blocker"
 
@@ -615,7 +626,7 @@ fun SearchScreenNoResultPreview() {
 
 @Composable
 @Preview
-fun SearchScreenInitializingPreview() {
+private fun SearchScreenInitializingPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
 
     BlockerTheme {
@@ -631,7 +642,7 @@ fun SearchScreenInitializingPreview() {
 
 @Composable
 @Preview
-fun SearchScreenLoadingPreview() {
+private fun SearchScreenLoadingPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
 
     BlockerTheme {
@@ -647,7 +658,7 @@ fun SearchScreenLoadingPreview() {
 
 @Composable
 @Preview
-fun SearchScreenErrorPreview() {
+private fun SearchScreenErrorPreview() {
     val tabState = SearchTabStatePreviewParameterProvider().values.first()
 
     BlockerTheme {

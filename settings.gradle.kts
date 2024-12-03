@@ -26,14 +26,19 @@ pluginManagement {
     }
 }
 
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version("0.8.0")
+}
+
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode = RepositoriesMode.FAIL_ON_PROJECT_REPOS
     repositories {
         google()
         mavenCentral()
         maven("https://jitpack.io")
     }
 }
+
 rootProject.name = "Blocker"
 include(":app-compose")
 include(":benchmarks")
@@ -48,6 +53,7 @@ include(":core:datastore-proto")
 include(":core:datastore-test")
 include(":core:designsystem")
 include(":core:domain")
+include(":core:git")
 include(":core:ifw-api")
 include(":core:model")
 include(":core:network")

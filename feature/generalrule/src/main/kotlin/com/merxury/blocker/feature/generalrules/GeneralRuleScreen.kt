@@ -18,14 +18,6 @@ package com.merxury.blocker.feature.generalrules
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.only
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,7 +31,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.merxury.blocker.core.analytics.LocalAnalyticsHelper
 import com.merxury.blocker.core.designsystem.component.BlockerErrorAlertDialog
 import com.merxury.blocker.core.designsystem.component.BlockerTopAppBarWithProgress
-import com.merxury.blocker.core.designsystem.component.ThemePreviews
+import com.merxury.blocker.core.designsystem.component.PreviewThemes
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
 import com.merxury.blocker.core.model.data.GeneralRule
 import com.merxury.blocker.core.ui.TrackScreenViewEvent
@@ -56,13 +48,18 @@ import com.merxury.blocker.feature.generalrules.GeneralRuleUiState.Success
 @Composable
 fun GeneralRulesRoute(
     navigateToRuleDetail: (String) -> Unit,
+    highlightSelectedRule: Boolean = false,
     viewModel: GeneralRulesViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val errorState by viewModel.errorState.collectAsStateWithLifecycle()
     GeneralRulesScreen(
+        highlightSelectedRule = highlightSelectedRule,
         uiState = uiState,
-        navigateToRuleDetail = navigateToRuleDetail,
+        navigateToRuleDetail = {
+            viewModel.onRuleClick(it)
+            navigateToRuleDetail(it)
+        },
     )
     if (errorState != null) {
         BlockerErrorAlertDialog(
@@ -75,66 +72,58 @@ fun GeneralRulesRoute(
 
 @Composable
 fun GeneralRulesScreen(
-    modifier: Modifier = Modifier,
     uiState: GeneralRuleUiState,
+    modifier: Modifier = Modifier,
+    highlightSelectedRule: Boolean = false,
     navigateToRuleDetail: (String) -> Unit = {},
 ) {
-    Scaffold(
-        topBar = {
-            BlockerTopAppBarWithProgress(
-                title = stringResource(id = R.string.feature_generalrule_rules),
-                progress = if (uiState is Success) {
-                    uiState.matchProgress
-                } else {
-                    null
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.Top,
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        BlockerTopAppBarWithProgress(
+            title = stringResource(id = R.string.feature_generalrule_sdk_trackers),
+            progress = if (uiState is Success) {
+                uiState.matchProgress
+            } else {
+                null
+            },
+        )
+        val analyticsHelper = LocalAnalyticsHelper.current
+        when (uiState) {
+            Loading -> {
+                LoadingScreen()
+            }
+
+            is Success -> GeneralRulesList(
+                matchedRules = uiState.matchedRules,
+                unmatchedRules = uiState.unmatchedRules,
+                highlightSelectedRule = highlightSelectedRule,
+                selectedRuleId = uiState.selectedRuleId,
+                onClick = { id ->
+                    navigateToRuleDetail(id)
+                    analyticsHelper.logGeneralRuleClicked(id)
                 },
             )
-        },
-    ) { padding ->
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(top = padding.calculateTopPadding())
-                .windowInsetsPadding(
-                    WindowInsets.safeDrawing.only(
-                        WindowInsetsSides.Horizontal,
-                    ),
-                ),
-            verticalArrangement = Arrangement.Top,
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            val analyticsHelper = LocalAnalyticsHelper.current
-            when (uiState) {
-                Loading -> {
-                    LoadingScreen()
-                }
 
-                is Success -> GeneralRulesList(
-                    rules = uiState.rules,
-                    onClick = { id ->
-                        navigateToRuleDetail(id)
-                        analyticsHelper.logGeneralRuleClicked(id)
-                    },
-                    modifier = modifier,
-                )
-
-                is Error -> ErrorScreen(error = uiState.error)
-            }
+            is Error -> ErrorScreen(error = uiState.error)
         }
     }
     TrackScreenViewEvent(screenName = "GeneralRulesScreen")
 }
 
 @Composable
-@ThemePreviews
-fun GeneralRuleScreenMatchProgressPreview(
+@PreviewThemes
+private fun GeneralRuleScreenMatchProgressPreview(
     @PreviewParameter(RuleListPreviewParameterProvider::class)
     ruleList: List<GeneralRule>,
 ) {
     BlockerTheme {
         GeneralRulesScreen(
             uiState = Success(
-                rules = ruleList,
+                matchedRules = ruleList.filter { it.matchedAppCount > 0 },
+                unmatchedRules = ruleList.filter { it.matchedAppCount == 0 },
                 matchProgress = 0.5F,
             ),
         )
@@ -143,14 +132,15 @@ fun GeneralRuleScreenMatchProgressPreview(
 
 @Composable
 @Preview
-fun GeneralRuleScreenMatchedCompletedPreview(
+private fun GeneralRuleScreenMatchedCompletedPreview(
     @PreviewParameter(RuleListPreviewParameterProvider::class)
     ruleList: List<GeneralRule>,
 ) {
     BlockerTheme {
         GeneralRulesScreen(
             uiState = Success(
-                rules = ruleList,
+                matchedRules = ruleList.filter { it.matchedAppCount > 0 },
+                unmatchedRules = ruleList.filter { it.matchedAppCount == 0 },
                 matchProgress = 1F,
             ),
         )
@@ -159,14 +149,15 @@ fun GeneralRuleScreenMatchedCompletedPreview(
 
 @Composable
 @Preview
-fun GeneralRuleScreenMatchStartPreview(
+private fun GeneralRuleScreenMatchStartPreview(
     @PreviewParameter(RuleListPreviewParameterProvider::class)
     ruleList: List<GeneralRule>,
 ) {
     BlockerTheme {
         GeneralRulesScreen(
             uiState = Success(
-                rules = ruleList,
+                matchedRules = ruleList.filter { it.matchedAppCount > 0 },
+                unmatchedRules = ruleList.filter { it.matchedAppCount == 0 },
                 matchProgress = 0F,
             ),
         )
@@ -174,8 +165,8 @@ fun GeneralRuleScreenMatchStartPreview(
 }
 
 @Composable
-@ThemePreviews
-fun GeneralRuleScreenLoading() {
+@PreviewThemes
+private fun GeneralRuleScreenLoading() {
     BlockerTheme {
         Surface {
             GeneralRulesScreen(
@@ -186,8 +177,8 @@ fun GeneralRuleScreenLoading() {
 }
 
 @Composable
-@ThemePreviews
-fun GeneralRuleScreenError() {
+@PreviewThemes
+private fun GeneralRuleScreenError() {
     BlockerTheme {
         Surface {
             GeneralRulesScreen(

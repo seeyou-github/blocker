@@ -16,6 +16,7 @@
 
 package com.merxury.blocker.feature.generalrules
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.merxury.blocker.core.data.respository.app.AppRepository
@@ -34,11 +35,11 @@ import com.merxury.blocker.core.ui.data.toErrorMessage
 import com.merxury.blocker.feature.generalrules.GeneralRuleUiState.Error
 import com.merxury.blocker.feature.generalrules.GeneralRuleUiState.Loading
 import com.merxury.blocker.feature.generalrules.GeneralRuleUiState.Success
+import com.merxury.blocker.feature.generalrules.navigation.RULE_ID_ARG
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -61,13 +62,23 @@ class GeneralRulesViewModel @Inject constructor(
     private val initGeneralRuleUseCase: InitializeRuleStorageUseCase,
     private val searchRule: SearchGeneralRuleUseCase,
     private val updateRule: UpdateRuleMatchedAppUseCase,
+    private val savedStateHandle: SavedStateHandle,
     @Dispatcher(IO) private val ioDispatcher: CoroutineDispatcher,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow<GeneralRuleUiState>(Loading)
     val uiState: StateFlow<GeneralRuleUiState> = _uiState.asStateFlow()
     private val _errorState = MutableStateFlow<UiMessage?>(null)
     val errorState = _errorState.asStateFlow()
+    private val loadExceptionHandler = CoroutineExceptionHandler { _, throwable ->
+        Timber.e(throwable, "Error occurred while loading general rules")
+        _errorState.value = throwable.toErrorMessage()
+        _uiState.value = (Error(throwable.toErrorMessage()))
+    }
     private var loadRuleJob: Job? = null
+    private val selectedRuleId: StateFlow<String?> = savedStateHandle.getStateFlow(
+        RULE_ID_ARG,
+        null,
+    )
 
     init {
         loadData()
@@ -77,9 +88,24 @@ class GeneralRulesViewModel @Inject constructor(
         _errorState.emit(null)
     }
 
+    fun onRuleClick(ruleId: String?) {
+        savedStateHandle[RULE_ID_ARG] = ruleId
+        loadSelectedRule()
+    }
+
+    private fun loadSelectedRule() {
+        _uiState.update {
+            if (it is Success) {
+                it.copy(selectedRuleId = selectedRuleId.value)
+            } else {
+                it
+            }
+        }
+    }
+
     private fun loadData() {
         loadRuleJob?.cancel()
-        loadRuleJob = viewModelScope.launch {
+        loadRuleJob = viewModelScope.launch(loadExceptionHandler) {
             if (!shouldRefreshList()) {
                 Timber.d("No need to refresh the list")
                 showGeneralRuleList(skipLoading = true)
@@ -103,11 +129,13 @@ class GeneralRulesViewModel @Inject constructor(
             .catch { _uiState.emit(Error(it.toErrorMessage())) }
             .distinctUntilChanged()
             .collect { rules ->
+                val matchedRules = rules.filter { it.matchedAppCount > 0 }
+                val unmatchedRules = rules.filter { it.matchedAppCount == 0 }
                 _uiState.update { state ->
                     val newState = if (state is Success) {
-                        state.copy(rules = rules)
+                        state.copy(matchedRules = matchedRules, unmatchedRules = unmatchedRules)
                     } else {
-                        Success(rules = rules)
+                        Success(matchedRules = matchedRules, unmatchedRules = unmatchedRules)
                     }
                     if (!skipLoading) {
                         newState
@@ -141,21 +169,18 @@ class GeneralRulesViewModel @Inject constructor(
             return@launch
         }
         var matchedApps = 0F
-        ruleList.map { rule ->
-            async {
-                // No need to handle result
-                updateRule(rule).firstOrNull()
-                matchedApps += 1
-                _uiState.update {
-                    if (it is Success) {
-                        it.copy(matchProgress = matchedApps / ruleList.size)
-                    } else {
-                        it
-                    }
+        ruleList.forEach { rule ->
+            // No need to handle result
+            updateRule(rule).firstOrNull()
+            matchedApps += 1
+            _uiState.update {
+                if (it is Success) {
+                    it.copy(matchProgress = matchedApps / ruleList.size)
+                } else {
+                    it
                 }
             }
         }
-            .awaitAll()
         saveHash()
     }
 
@@ -179,17 +204,13 @@ class GeneralRulesViewModel @Inject constructor(
         return shouldReloadList
     }
 
-    private suspend fun getCurrentAppListHash(): String {
-        return appRepository.getApplicationList()
-            .first()
-            .hashCode()
-            .toString()
-    }
+    private suspend fun getCurrentAppListHash(): String = appRepository.getApplicationList()
+        .first()
+        .hashCode()
+        .toString()
 
-    private suspend fun getCurrentRuleHash(): String {
-        return generalRuleRepository.getRuleHash()
-            .first()
-    }
+    private suspend fun getCurrentRuleHash(): String = generalRuleRepository.getRuleHash()
+        .first()
 
     private suspend fun saveHash() {
         val appListHash = getCurrentAppListHash()
@@ -203,8 +224,10 @@ class GeneralRulesViewModel @Inject constructor(
 sealed interface GeneralRuleUiState {
     data object Loading : GeneralRuleUiState
     data class Success(
-        val rules: List<GeneralRule>,
+        val matchedRules: List<GeneralRule>,
+        val unmatchedRules: List<GeneralRule>,
         val matchProgress: Float = 0F,
+        val selectedRuleId: String? = null,
     ) : GeneralRuleUiState
 
     data class Error(val error: UiMessage) : GeneralRuleUiState

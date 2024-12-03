@@ -37,9 +37,7 @@
     <string name="core_ui_block_selected">禁用選中</string>
     <string name="core_ui_select_all">全選</string>
     <string name="core_ui_enable_selected">啟用選中</string>
-    <plurals name="core_ui_matched_component">
-        <item quantity="other">%1$d個組件</item>
-    </plurals>
+    <string name="core_ui_matched">%1$d 匹配，%2$d 阻擋，%3$d 啟用。</string>
     <plurals name="core_ui_matched_apps">
         <item quantity="other">匹配%1$d個應用</item>
     </plurals>
@@ -78,4 +76,6 @@
     <string name="core_ui_operation_completed">操作已完成</string>
     <string name="core_ui_do_you_want_to_clear_data_of_this_app">您想要清除此應用的數據嗎？</string>
     <string name="core_ui_do_you_want_to_uninstall_this_app">您想要卸載此應用嗎？</string>
+    <string name="core_ui_found">已找到</string>
+    <string name="core_ui_not_found">未找到</string>
 </resources>

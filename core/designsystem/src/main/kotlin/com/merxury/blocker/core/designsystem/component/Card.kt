@@ -16,24 +16,25 @@
 
 package com.merxury.blocker.core.designsystem.component
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockerOutlinedCard(
-    modifier: Modifier = Modifier,
     onClick: () -> Unit,
-    content: @Composable ColumnScope.() -> Unit,
+    modifier: Modifier = Modifier,
+    color: Color = Color.Transparent,
+    content: @Composable ColumnScope.() -> Unit = {},
 ) {
     OutlinedCard(
         modifier = modifier
@@ -41,13 +42,19 @@ fun BlockerOutlinedCard(
             .padding(8.dp),
         onClick = onClick,
     ) {
-        content()
+        Column(
+            modifier = Modifier
+                .background(color = color)
+                .fillMaxWidth(),
+        ) {
+            content()
+        }
     }
 }
 
-@ThemePreviews
+@PreviewThemes
 @Composable
-fun BlockerOutlinedCardPreview() {
+private fun BlockerOutlinedCardPreview() {
     BlockerTheme {
         Surface {
             BlockerOutlinedCard(

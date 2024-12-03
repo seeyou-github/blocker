@@ -25,7 +25,6 @@ plugins {
     alias(libs.plugins.blocker.android.application.firebase)
     alias(libs.plugins.ksp)
     id("kotlin-parcelize")
-    id("com.google.android.gms.oss-licenses-plugin")
     alias(libs.plugins.baselineprofile)
     alias(libs.plugins.roborazzi)
 }
@@ -96,9 +95,9 @@ dependencies {
     implementation(projects.feature.appdetail)
     implementation(projects.feature.applist)
     implementation(projects.feature.generalrule)
+    implementation(projects.feature.ruledetail)
     implementation(projects.feature.search)
     implementation(projects.feature.settings)
-    implementation(projects.feature.ruledetail)
     implementation(projects.feature.sort)
 
     implementation(projects.core.analytics)
@@ -113,16 +112,23 @@ dependencies {
     implementation(projects.sync.work)
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material3.adaptive)
+    implementation(libs.androidx.compose.material3.adaptive.layout)
+    implementation(libs.androidx.compose.material3.adaptive.navigation)
+    implementation(libs.androidx.compose.material3.windowSizeClass)
+    implementation(libs.androidx.compose.runtime.tracing)
+    implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.tracing.ktx)
     implementation(libs.androidx.compose.animation)
+    implementation(libs.androidx.compose.material.navigation)
+    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.lifecycle.runtimeCompose)
-    implementation(libs.androidx.compose.material3.windowSizeClass)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.window.core)
     implementation(libs.androidx.work.ktx)
     implementation(libs.androidx.profileinstaller)
-    implementation(libs.accompanist.navigation.material)
     implementation(libs.coil.kt)
     implementation(libs.coil.kt.svg)
     implementation(libs.hilt.ext.work)
@@ -132,18 +138,21 @@ dependencies {
     implementation(libs.libsu.core)
     implementation(libs.timber)
 
+    ksp(libs.hilt.compiler)
+
     debugImplementation(libs.androidx.compose.ui.testManifest)
     debugImplementation(projects.uiTestHiltManifest)
 
     kspTest(libs.hilt.compiler)
 
     testImplementation(projects.core.dataTest)
+    testImplementation(projects.core.datastoreTest)
     testImplementation(projects.core.testing)
-    testImplementation(libs.accompanist.testharness)
+    testImplementation(projects.uiTestHiltManifest)
+    testImplementation(libs.androidx.compose.ui.test)
     testImplementation(libs.hilt.android.testing)
     testImplementation(libs.work.testing)
     testFossImplementation(libs.robolectric)
-    testFossImplementation(libs.roborazzi)
     testFossImplementation(projects.core.screenshotTesting)
 
     androidTestImplementation(projects.core.testing)
@@ -151,7 +160,7 @@ dependencies {
     androidTestImplementation(projects.core.datastoreTest)
     androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(libs.androidx.navigation.testing)
-    androidTestImplementation(libs.accompanist.testharness)
+    androidTestImplementation(libs.androidx.compose.ui.test)
     androidTestImplementation(libs.hilt.android.testing)
 
     baselineProfile(projects.benchmarks)
@@ -161,6 +170,8 @@ baselineProfile {
     // Don't build on every iteration of a full assemble.
     // Instead enable generation directly for the release build variant.
     automaticGenerationDuringBuild = false
+    // Make use of Dex Layout Optimizations via Startup Profiles
+    dexLayoutOptimization = true
 }
 
 dependencyGuard {

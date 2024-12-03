@@ -1,4 +1,4 @@
-/* Copyright 2024 Blocker
+/*
  * Copyright 2023 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +16,6 @@
 
 package com.merxury.blocker.core.designsystem.component.scrollbar
 
-import android.annotation.SuppressLint
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
@@ -61,22 +60,25 @@ import com.merxury.blocker.core.designsystem.component.scrollbar.ThumbState.Dorm
 import com.merxury.blocker.core.designsystem.component.scrollbar.ThumbState.Inactive
 import kotlinx.coroutines.delay
 
-private const val INACTIVE_TO_DORMANT_COOL_DOWN = 2_000L
+/**
+ * The time period for showing the scrollbar thumb after interacting with it, before it fades away
+ */
+private const val SCROLLBAR_INACTIVE_TO_DORMANT_TIME_IN_MS = 2_000L
 
 /**
- * A [Scrollbar] that allows for fast scrolling of content.
+ * A [Scrollbar] that allows for fast scrolling of content by dragging its thumb.
  * Its thumb disappears when the scrolling container is dormant.
  * @param modifier a [Modifier] for the [Scrollbar]
  * @param state the driving state for the [Scrollbar]
  * @param orientation the orientation of the scrollbar
- * @param onThumbMoved the fast scroll implementation
+ * @param onThumbMove the fast scroll implementation
  */
 @Composable
-fun ScrollableState.FastScrollbar(
-    modifier: Modifier = Modifier,
+fun ScrollableState.DraggableScrollbar(
     state: ScrollbarState,
     orientation: Orientation,
-    onThumbMoved: (Float) -> Unit,
+    onThumbMove: (Float) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Scrollbar(
@@ -85,12 +87,12 @@ fun ScrollableState.FastScrollbar(
         interactionSource = interactionSource,
         state = state,
         thumb = {
-            FastScrollbarThumb(
+            DraggableScrollbarThumb(
                 interactionSource = interactionSource,
                 orientation = orientation,
             )
         },
-        onThumbMoved = onThumbMoved,
+        onThumbMove = onThumbMove,
     )
 }
 
@@ -103,9 +105,9 @@ fun ScrollableState.FastScrollbar(
  */
 @Composable
 fun ScrollableState.DecorativeScrollbar(
-    modifier: Modifier = Modifier,
     state: ScrollbarState,
     orientation: Orientation,
+    modifier: Modifier = Modifier,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     Scrollbar(
@@ -126,7 +128,7 @@ fun ScrollableState.DecorativeScrollbar(
  * A scrollbar thumb that is intended to also be a touch target for fast scrolling.
  */
 @Composable
-private fun ScrollableState.FastScrollbarThumb(
+private fun ScrollableState.DraggableScrollbarThumb(
     interactionSource: InteractionSource,
     orientation: Orientation,
 ) {
@@ -134,8 +136,8 @@ private fun ScrollableState.FastScrollbarThumb(
         modifier = Modifier
             .run {
                 when (orientation) {
-                    Vertical -> width(4.dp).fillMaxHeight()
-                    Horizontal -> height(4.dp).fillMaxWidth()
+                    Vertical -> width(12.dp).fillMaxHeight()
+                    Horizontal -> height(12.dp).fillMaxWidth()
                 }
             }
             .scrollThumb(this, interactionSource),
@@ -143,7 +145,7 @@ private fun ScrollableState.FastScrollbarThumb(
 }
 
 /**
- * A decorative scrollbar thumb for communicating a user's position in a list solely.
+ * A decorative scrollbar thumb used solely for communicating a user's position in a list.
  */
 @Composable
 private fun ScrollableState.DecorativeScrollbarThumb(
@@ -162,9 +164,6 @@ private fun ScrollableState.DecorativeScrollbarThumb(
     )
 }
 
-// TODO: This lint is removed in 1.6 as the recommendation has changed
-// remove when project is upgraded
-@SuppressLint("ComposableModifierFactory")
 @Composable
 private fun Modifier.scrollThumb(
     scrollableState: ScrollableState,
@@ -174,20 +173,22 @@ private fun Modifier.scrollThumb(
     return this then ScrollThumbElement { colorState.value }
 }
 
-private data class ScrollThumbElement(val colorProducer: ColorProducer) :
-    ModifierNodeElement<ScrollThumbNode>() {
+private data class ScrollThumbElement(val colorProducer: ColorProducer) : ModifierNodeElement<ScrollThumbNode>() {
     override fun create(): ScrollThumbNode = ScrollThumbNode(colorProducer)
     override fun update(node: ScrollThumbNode) {
         node.colorProducer = colorProducer
         node.invalidateDraw()
     }
+
     override fun InspectorInfo.inspectableProperties() {
         name = "scrollThumb"
         properties["colorProducer"] = colorProducer
     }
 }
 
-private class ScrollThumbNode(var colorProducer: ColorProducer) : DrawModifierNode, Modifier.Node() {
+private class ScrollThumbNode(var colorProducer: ColorProducer) :
+    Modifier.Node(),
+    DrawModifierNode {
     private val shape = RoundedCornerShape(16.dp)
 
     // naive cache outline calculation if size is the same
@@ -243,7 +244,7 @@ private fun scrollbarThumbColor(
             true -> state = Active
             false -> if (state == Active) {
                 state = Inactive
-                delay(INACTIVE_TO_DORMANT_COOL_DOWN)
+                delay(SCROLLBAR_INACTIVE_TO_DORMANT_TIME_IN_MS)
                 state = Dormant
             }
         }

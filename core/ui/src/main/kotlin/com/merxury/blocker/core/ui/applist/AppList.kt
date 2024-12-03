@@ -35,8 +35,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import com.merxury.blocker.core.designsystem.component.ThemePreviews
-import com.merxury.blocker.core.designsystem.component.scrollbar.FastScrollbar
+import com.merxury.blocker.core.designsystem.component.PreviewThemes
+import com.merxury.blocker.core.designsystem.component.scrollbar.DraggableScrollbar
 import com.merxury.blocker.core.designsystem.component.scrollbar.rememberDraggableScroller
 import com.merxury.blocker.core.designsystem.component.scrollbar.scrollbarState
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
@@ -48,6 +48,8 @@ import com.merxury.blocker.core.ui.previewparameter.AppListPreviewParameterProvi
 fun AppList(
     appList: List<AppItem>,
     modifier: Modifier = Modifier,
+    highlightSelectedApp: Boolean = false,
+    selectedPackageName: String? = null,
     onAppItemClick: (String) -> Unit = {},
     onClearCacheClick: (String) -> Unit = {},
     onClearDataClick: (String) -> Unit = {},
@@ -62,11 +64,9 @@ fun AppList(
     )
     TrackScrollJank(scrollableState = listState, stateName = "app:list")
     Box(modifier.fillMaxSize()) {
-        LazyColumn(
-            modifier = modifier,
-            state = listState,
-        ) {
+        LazyColumn(state = listState) {
             itemsIndexed(appList, key = { _, item -> item.packageName }) { _, item ->
+                val isSelected = highlightSelectedApp && item.packageName == selectedPackageName
                 AppListItem(
                     label = item.label,
                     packageName = item.packageName,
@@ -83,13 +83,14 @@ fun AppList(
                     onUninstallClick = onUninstallClick,
                     onEnableClick = onEnableClick,
                     onDisableClick = onDisableClick,
+                    isSelected = isSelected,
                 )
             }
             item {
                 Spacer(Modifier.windowInsetsBottomHeight(WindowInsets.safeDrawing))
             }
         }
-        listState.FastScrollbar(
+        listState.DraggableScrollbar(
             modifier = Modifier
                 .fillMaxHeight()
                 .padding(horizontal = 2.dp)
@@ -97,7 +98,7 @@ fun AppList(
                 .testTag("appList:scrollbar"),
             state = scrollbarState,
             orientation = Orientation.Vertical,
-            onThumbMoved = listState.rememberDraggableScroller(
+            onThumbMove = listState.rememberDraggableScroller(
                 itemsAvailable = appList.size,
             ),
         )
@@ -105,8 +106,8 @@ fun AppList(
 }
 
 @Composable
-@ThemePreviews
-fun AppListPreview(
+@PreviewThemes
+private fun AppListPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {

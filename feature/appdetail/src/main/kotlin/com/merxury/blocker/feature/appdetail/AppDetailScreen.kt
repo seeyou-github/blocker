@@ -85,8 +85,8 @@ import com.merxury.blocker.core.designsystem.component.BlockerSearchTextField
 import com.merxury.blocker.core.designsystem.component.BlockerTab
 import com.merxury.blocker.core.designsystem.component.MaxToolbarHeight
 import com.merxury.blocker.core.designsystem.component.MinToolbarHeight
+import com.merxury.blocker.core.designsystem.component.PreviewThemes
 import com.merxury.blocker.core.designsystem.component.SnackbarHostState
-import com.merxury.blocker.core.designsystem.component.ThemePreviews
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
 import com.merxury.blocker.core.designsystem.theme.IconThemingState
 import com.merxury.blocker.core.domain.model.ComponentSearchResult
@@ -111,7 +111,7 @@ import com.merxury.blocker.core.ui.AppDetailTabs.Provider
 import com.merxury.blocker.core.ui.AppDetailTabs.Receiver
 import com.merxury.blocker.core.ui.AppDetailTabs.Sdk
 import com.merxury.blocker.core.ui.AppDetailTabs.Service
-import com.merxury.blocker.core.ui.DevicePreviews
+import com.merxury.blocker.core.ui.PreviewDevices
 import com.merxury.blocker.core.ui.TabState
 import com.merxury.blocker.core.ui.TrackScreenViewEvent
 import com.merxury.blocker.core.ui.component.ComponentList
@@ -145,13 +145,14 @@ import com.merxury.blocker.core.ui.R.string as uistring
 
 @Composable
 fun AppDetailRoute(
-    modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState,
+    updateIconThemingState: (IconThemingState) -> Unit,
     onBackClick: () -> Unit,
     navigateToComponentDetail: (String) -> Unit,
     navigateToComponentSortScreen: () -> Unit,
+    modifier: Modifier = Modifier,
     navigateToRuleDetail: (String) -> Unit = {},
-    snackbarHostState: SnackbarHostState,
-    updateIconBasedThemingState: (IconThemingState) -> Unit,
+    showBackButton: Boolean = true,
     viewModel: AppDetailViewModel = hiltViewModel(),
 ) {
     val tabState by viewModel.tabState.collectAsStateWithLifecycle()
@@ -184,8 +185,8 @@ fun AppDetailRoute(
         },
         switchTab = viewModel::switchTab,
         onBackClick = onBackClick,
-        onSearchTextChanged = viewModel::search,
-        onSearchModeChanged = viewModel::changeSearchMode,
+        onSearchTextChange = viewModel::search,
+        onSearchModeChange = viewModel::changeSearchMode,
         blockAllComponentsInPage = {
             viewModel.controlAllComponentsInPage(false) { current, total ->
                 showDisableProgress(context, snackbarHostState, scope, current, total)
@@ -206,7 +207,7 @@ fun AppDetailRoute(
         onLaunchActivityClick = viewModel::launchActivity,
         onCopyNameClick = { clipboardManager.setText(AnnotatedString(it)) },
         onCopyFullNameClick = { clipboardManager.setText(AnnotatedString(it)) },
-        updateIconBasedThemingState = updateIconBasedThemingState,
+        updateIconThemingState = updateIconThemingState,
         onSelectAll = viewModel::selectAll,
         blockAllSelectedComponents = { viewModel.controlAllSelectedComponents(false) },
         enableAllSelectedComponents = { viewModel.controlAllSelectedComponents(true) },
@@ -242,6 +243,7 @@ fun AppDetailRoute(
             viewModel.loadComponentList()
             viewModel.updateComponentList()
         },
+        showBackButton = showBackButton,
     )
     if (appInfoUiState.error != null) {
         BlockerErrorAlertDialog(
@@ -252,7 +254,7 @@ fun AppDetailRoute(
     }
     DisposableEffect(Unit) {
         onDispose {
-            updateIconBasedThemingState(IconThemingState())
+            updateIconThemingState(IconThemingState())
         }
     }
     event?.let {
@@ -395,13 +397,14 @@ fun AppDetailScreen(
     componentListUiState: Result<ComponentSearchResult>,
     tabState: TabState<AppDetailTabs>,
     modifier: Modifier = Modifier,
+    showBackButton: Boolean = true,
     onBackClick: () -> Unit = {},
     onLaunchAppClick: (String) -> Unit = {},
     switchTab: (AppDetailTabs) -> Unit = {},
     navigateToComponentDetail: (String) -> Unit = {},
     navigateToRuleDetail: (String) -> Unit = {},
-    onSearchTextChanged: (String) -> Unit = {},
-    onSearchModeChanged: (Boolean) -> Unit = {},
+    onSearchTextChange: (String) -> Unit = {},
+    onSearchModeChange: (Boolean) -> Unit = {},
     blockAllComponentsInPage: () -> Unit = {},
     enableAllComponentsInPage: () -> Unit = {},
     onShowAppInfoClick: () -> Unit = {},
@@ -416,7 +419,7 @@ fun AppDetailScreen(
     onCopyNameClick: (String) -> Unit = { _ -> },
     onCopyFullNameClick: (String) -> Unit = { _ -> },
     navigateToComponentSortScreen: () -> Unit = {},
-    updateIconBasedThemingState: (IconThemingState) -> Unit = {},
+    updateIconThemingState: (IconThemingState) -> Unit = {},
     onSelectAll: () -> Unit = {},
     blockAllSelectedComponents: () -> Unit = {},
     enableAllSelectedComponents: () -> Unit = {},
@@ -443,8 +446,8 @@ fun AppDetailScreen(
         onLaunchAppClick = onLaunchAppClick,
         switchTab = switchTab,
         modifier = modifier,
-        onSearchTextChanged = onSearchTextChanged,
-        onSearchModeChanged = onSearchModeChanged,
+        onSearchTextChange = onSearchTextChange,
+        onSearchModeChange = onSearchModeChange,
         enableAllComponentsInPage = enableAllComponentsInPage,
         blockAllComponentsInPage = blockAllComponentsInPage,
         onShowAppInfoClick = onShowAppInfoClick,
@@ -458,7 +461,7 @@ fun AppDetailScreen(
         onLaunchActivityClick = onLaunchActivityClick,
         onCopyNameClick = onCopyNameClick,
         onCopyFullNameClick = onCopyFullNameClick,
-        updateIconBasedThemingState = updateIconBasedThemingState,
+        updateIconThemingState = updateIconThemingState,
         onSelectAll = onSelectAll,
         blockAllSelectedComponents = blockAllSelectedComponents,
         enableAllSelectedComponents = enableAllSelectedComponents,
@@ -472,6 +475,7 @@ fun AppDetailScreen(
         onRefresh = onRefresh,
         showOpenInLibChecker = appInfoUiState.showOpenInLibChecker,
         matchedGeneralRuleUiState = appInfoUiState.matchedRuleUiState,
+        showBackButton = showBackButton,
     )
     TrackScreenViewEvent(screenName = "AppDetailScreen")
 }
@@ -484,16 +488,18 @@ fun AppDetailContent(
     onBackClick: () -> Unit,
     onLaunchAppClick: (String) -> Unit,
     switchTab: (AppDetailTabs) -> Unit,
+    navigateToComponentSortScreen: () -> Unit,
+    updateIconThemingState: (IconThemingState) -> Unit,
     topAppBarUiState: AppBarUiState,
     modifier: Modifier = Modifier,
     seedColor: Color? = null,
     isRefreshing: Boolean = false,
+    showBackButton: Boolean = true,
     navigateToComponentDetail: (String) -> Unit = {},
     navigateToRuleDetail: (String) -> Unit = {},
-    navigateToComponentSortScreen: () -> Unit,
     onShowAppInfoClick: () -> Unit = {},
-    onSearchTextChanged: (String) -> Unit = {},
-    onSearchModeChanged: (Boolean) -> Unit = {},
+    onSearchTextChange: (String) -> Unit = {},
+    onSearchModeChange: (Boolean) -> Unit = {},
     blockAllComponentsInPage: () -> Unit = {},
     enableAllComponentsInPage: () -> Unit = {},
     onExportRules: (String) -> Unit = {},
@@ -506,7 +512,6 @@ fun AppDetailContent(
     onLaunchActivityClick: (String, String) -> Unit = { _, _ -> },
     onCopyNameClick: (String) -> Unit = { _ -> },
     onCopyFullNameClick: (String) -> Unit = { _ -> },
-    updateIconBasedThemingState: (IconThemingState) -> Unit,
     onSelectAll: () -> Unit = {},
     blockAllSelectedComponents: () -> Unit = {},
     enableAllSelectedComponents: () -> Unit = {},
@@ -532,7 +537,8 @@ fun AppDetailContent(
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
                 toolbarState.scrollTopLimitReached =
-                    listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                    listState.firstVisibleItemIndex == 0 &&
+                    listState.firstVisibleItemScrollOffset == 0
                 toolbarState.scrollOffset -= available.y
                 return Offset(0f, toolbarState.consumed)
             }
@@ -546,7 +552,8 @@ fun AppDetailContent(
                             animationSpec = FloatExponentialDecaySpec(),
                         ) { value, _ ->
                             toolbarState.scrollTopLimitReached =
-                                listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
+                                listState.firstVisibleItemIndex == 0 &&
+                                listState.firstVisibleItemScrollOffset == 0
                             toolbarState.scrollOffset -= (value - (toolbarState.height + toolbarState.offset))
                             if (toolbarState.scrollOffset == 0f) scope.coroutineContext.cancelChildren()
                         }
@@ -556,7 +563,7 @@ fun AppDetailContent(
             }
         }
     }
-    updateIconBasedThemingState(IconThemingState(seedColor = seedColor))
+    updateIconThemingState(IconThemingState(seedColor = seedColor))
     Scaffold(
         topBar = {
             TopAppBar(
@@ -565,8 +572,8 @@ fun AppDetailContent(
                 app = app,
                 topAppBarUiState = topAppBarUiState,
                 toolbarState = toolbarState,
-                onSearchTextChanged = onSearchTextChanged,
-                onSearchModeChanged = onSearchModeChanged,
+                onSearchTextChange = onSearchTextChange,
+                onSearchModeChange = onSearchModeChange,
                 blockAllComponentsInPage = blockAllComponentsInPage,
                 enableAllComponentsInPage = enableAllComponentsInPage,
                 navigateToComponentSortScreen = navigateToComponentSortScreen,
@@ -578,6 +585,7 @@ fun AppDetailContent(
                 onBackClick = onBackClick,
                 shareAppRule = shareAppRule,
                 shareAllRules = shareAllRules,
+                showBackButton = showBackButton,
             )
         },
         modifier = modifier.nestedScroll(nestedScrollConnection),
@@ -625,7 +633,8 @@ fun AppDetailContent(
 @Composable
 fun AppDetailAppBarActions(
     appBarUiState: AppBarUiState,
-    onSearchTextChanged: (String) -> Unit = {},
+    modifier: Modifier = Modifier,
+    onSearchTextChange: (String) -> Unit = {},
     onSearchModeChange: (Boolean) -> Unit = {},
     blockAllComponentsInPage: () -> Unit = {},
     enableAllComponentsInPage: () -> Unit = {},
@@ -636,7 +645,7 @@ fun AppDetailAppBarActions(
 ) {
     val actions = appBarUiState.actions
     Row(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(end = 16.dp),
         horizontalArrangement = Arrangement.End,
@@ -647,8 +656,8 @@ fun AppDetailAppBarActions(
                 BlockerSearchTextField(
                     modifier = Modifier.weight(1f),
                     searchQuery = appBarUiState.keyword,
-                    onSearchQueryChanged = onSearchTextChanged,
-                    onSearchTriggered = onSearchTextChanged,
+                    onSearchQueryChange = onSearchTextChange,
+                    onSearchTrigger = onSearchTextChange,
                     placeholder = {
                         Text(
                             text = stringResource(id = string.feature_appdetail_search_components),
@@ -680,10 +689,8 @@ fun AppDetailAppBarActions(
 }
 
 @Composable
-private fun rememberToolbarState(toolbarHeightRange: IntRange): ToolbarState {
-    return rememberSaveable(saver = ExitUntilCollapsedState.Saver) {
-        ExitUntilCollapsedState(heightRange = toolbarHeightRange)
-    }
+private fun rememberToolbarState(toolbarHeightRange: IntRange): ToolbarState = rememberSaveable(saver = ExitUntilCollapsedState.Saver) {
+    ExitUntilCollapsedState(heightRange = toolbarHeightRange)
 }
 
 @Composable
@@ -693,8 +700,11 @@ private fun TopAppBar(
     app: AppItem,
     topAppBarUiState: AppBarUiState,
     toolbarState: ToolbarState,
-    onSearchTextChanged: (String) -> Unit = {},
-    onSearchModeChanged: (Boolean) -> Unit = {},
+    onBackClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    showBackButton: Boolean = true,
+    onSearchTextChange: (String) -> Unit = {},
+    onSearchModeChange: (Boolean) -> Unit = {},
     blockAllComponentsInPage: () -> Unit = {},
     enableAllComponentsInPage: () -> Unit = {},
     navigateToComponentSortScreen: () -> Unit = {},
@@ -703,16 +713,16 @@ private fun TopAppBar(
     blockAllSelectedComponents: () -> Unit = {},
     enableAllSelectedComponents: () -> Unit = {},
     switchSelectedMode: (Boolean) -> Unit = {},
-    onBackClick: () -> Unit,
     shareAppRule: () -> Unit = {},
     shareAllRules: () -> Unit = {},
 ) {
     if (!isSelectedMode) {
         BlockerCollapsingTopAppBar(
+            showBackButton = showBackButton,
             progress = toolbarState.progress,
             onNavigationClick = {
                 if (isSearchMode) {
-                    onSearchModeChanged(false)
+                    onSearchModeChange(false)
                 } else {
                     onBackClick()
                 }
@@ -721,8 +731,8 @@ private fun TopAppBar(
             actions = {
                 AppDetailAppBarActions(
                     appBarUiState = topAppBarUiState,
-                    onSearchTextChanged = onSearchTextChanged,
-                    onSearchModeChange = onSearchModeChanged,
+                    onSearchTextChange = onSearchTextChange,
+                    onSearchModeChange = onSearchModeChange,
                     blockAllComponentsInPage = blockAllComponentsInPage,
                     enableAllComponentsInPage = enableAllComponentsInPage,
                     navigateToComponentSortScreen = navigateToComponentSortScreen,
@@ -739,7 +749,7 @@ private fun TopAppBar(
             ),
             iconSource = app.packageInfo,
             onIconClick = { onLaunchAppClick(app.packageName) },
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxWidth()
                 .height(with(LocalDensity.current) { toolbarState.height.toDp() }),
         )
@@ -752,6 +762,7 @@ private fun TopAppBar(
             onSelectAll = onSelectAll,
             onBlockAllSelectedComponents = blockAllSelectedComponents,
             onEnableAllSelectedComponents = enableAllSelectedComponents,
+            modifier = modifier,
         )
     }
 }
@@ -759,11 +770,11 @@ private fun TopAppBar(
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterialApi::class)
 @Composable
 fun AppDetailTabContent(
-    modifier: Modifier = Modifier,
     app: AppItem,
     componentListUiState: Result<ComponentSearchResult>,
     tabState: TabState<AppDetailTabs>,
     switchTab: (AppDetailTabs) -> Unit,
+    modifier: Modifier = Modifier,
     selectedComponentList: List<ComponentInfo> = emptyList(),
     isSelectedMode: Boolean = false,
     navigateToComponentDetail: (String) -> Unit = {},
@@ -902,8 +913,8 @@ fun AppDetailTabContent(
 }
 
 @Composable
-@DevicePreviews
-fun AppDetailScreenAppInfoPreview(
+@PreviewDevices
+private fun AppDetailScreenAppInfoPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -925,8 +936,8 @@ fun AppDetailScreenAppInfoPreview(
 }
 
 @Composable
-@DevicePreviews
-fun AppDetailScreenComponentPreview(
+@PreviewDevices
+private fun AppDetailScreenComponentPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -956,7 +967,7 @@ fun AppDetailScreenComponentPreview(
 
 @Composable
 @Preview
-fun AppDetailScreenComponentEmptyPreview(
+private fun AppDetailScreenComponentEmptyPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -980,7 +991,7 @@ fun AppDetailScreenComponentEmptyPreview(
 
 @Composable
 @Preview
-fun AppDetailScreenComponentLoadingPreview() {
+private fun AppDetailScreenComponentLoadingPreview() {
     val tabState = AppDetailTabStatePreviewParameterProvider().values.first()
     BlockerTheme {
         Surface {
@@ -999,7 +1010,7 @@ fun AppDetailScreenComponentLoadingPreview() {
 
 @Composable
 @Preview
-fun AppDetailScreenComponentRefreshingPreview() {
+private fun AppDetailScreenComponentRefreshingPreview() {
     val tabState = AppDetailTabStatePreviewParameterProvider().values.first()
     val components = ComponentListPreviewParameterProvider().values.first()
     BlockerTheme {
@@ -1024,7 +1035,7 @@ fun AppDetailScreenComponentRefreshingPreview() {
 
 @Composable
 @Preview
-fun AppDetailScreenComponentErrorPreview(
+private fun AppDetailScreenComponentErrorPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -1048,7 +1059,7 @@ fun AppDetailScreenComponentErrorPreview(
 
 @Composable
 @Preview
-fun AppDetailScreenSdkPreview(
+private fun AppDetailScreenSdkPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -1085,7 +1096,7 @@ fun AppDetailScreenSdkPreview(
 
 @Composable
 @Preview
-fun AppDetailScreenSdkLoadingPreview(
+private fun AppDetailScreenSdkLoadingPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -1110,7 +1121,7 @@ fun AppDetailScreenSdkLoadingPreview(
 
 @Composable
 @Preview
-fun AppDetailScreenSdkErrorPreview(
+private fun AppDetailScreenSdkErrorPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -1136,8 +1147,8 @@ fun AppDetailScreenSdkErrorPreview(
 }
 
 @Composable
-@ThemePreviews
-fun AppDetailScreenSearchModePreview(
+@PreviewThemes
+private fun AppDetailScreenSearchModePreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -1167,8 +1178,8 @@ fun AppDetailScreenSearchModePreview(
 }
 
 @Composable
-@ThemePreviews
-fun AppDetailScreenSelectedModePreview(
+@PreviewThemes
+private fun AppDetailScreenSelectedModePreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {

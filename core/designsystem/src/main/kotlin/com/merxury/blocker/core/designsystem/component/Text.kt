@@ -24,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
@@ -31,8 +32,8 @@ import com.merxury.blocker.core.designsystem.theme.BlockerTheme
 
 @Composable
 fun BlockerBodySmallText(
-    modifier: Modifier = Modifier,
     text: String,
+    modifier: Modifier = Modifier,
     maxLines: Int = Int.MAX_VALUE,
     style: TextStyle = MaterialTheme.typography.bodySmall,
     color: Color = MaterialTheme.colorScheme.onSurface,
@@ -49,12 +50,13 @@ fun BlockerBodySmallText(
 
 @Composable
 fun BlockerBodyMediumText(
-    modifier: Modifier = Modifier,
     text: String,
+    modifier: Modifier = Modifier,
     fontSize: TextUnit = TextUnit.Unspecified,
     maxLines: Int = Int.MAX_VALUE,
     style: TextStyle = MaterialTheme.typography.bodyMedium,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    fontWeight: FontWeight? = FontWeight(400),
 ) {
     Text(
         text = text,
@@ -64,13 +66,14 @@ fun BlockerBodyMediumText(
         modifier = modifier,
         fontSize = fontSize,
         color = color,
+        fontWeight = fontWeight,
     )
 }
 
 @Composable
 fun BlockerBodyLargeText(
-    modifier: Modifier = Modifier,
     text: String,
+    modifier: Modifier = Modifier,
     fontSize: TextUnit = TextUnit.Unspecified,
     maxLines: Int = Int.MAX_VALUE,
     style: TextStyle = MaterialTheme.typography.bodyLarge,
@@ -89,8 +92,8 @@ fun BlockerBodyLargeText(
 
 @Composable
 fun BlockerLabelSmallText(
-    modifier: Modifier = Modifier,
     text: String,
+    modifier: Modifier = Modifier,
     maxLines: Int = Int.MAX_VALUE,
     style: TextStyle = MaterialTheme.typography.labelSmall,
     color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -107,9 +110,9 @@ fun BlockerLabelSmallText(
     )
 }
 
-@ThemePreviews
+@PreviewThemes
 @Composable
-fun BlockerBodySmallTextPreview() {
+private fun BlockerBodySmallTextPreview() {
     BlockerTheme {
         Surface {
             Column {

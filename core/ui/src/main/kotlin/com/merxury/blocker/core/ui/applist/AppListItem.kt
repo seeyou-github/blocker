@@ -18,9 +18,12 @@ package com.merxury.blocker.core.ui.applist
 
 import android.content.pm.PackageInfo
 import android.view.MotionEvent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,6 +50,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.DpOffset
@@ -56,7 +61,7 @@ import coil.request.ImageRequest
 import com.merxury.blocker.core.designsystem.component.BlockerBodyLargeText
 import com.merxury.blocker.core.designsystem.component.BlockerBodyMediumText
 import com.merxury.blocker.core.designsystem.component.BlockerLabelSmallText
-import com.merxury.blocker.core.designsystem.component.ThemePreviews
+import com.merxury.blocker.core.designsystem.component.PreviewThemes
 import com.merxury.blocker.core.designsystem.icon.BlockerIcons
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
 import com.merxury.blocker.core.model.data.AppItem
@@ -84,58 +89,68 @@ fun AppListItem(
     onUninstallClick: (String) -> Unit = {},
     onEnableClick: (String) -> Unit = {},
     onDisableClick: (String) -> Unit = {},
+    isSelected: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     var touchPoint: Offset by remember { mutableStateOf(Offset.Zero) }
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
-    Box {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = modifier
-                .fillMaxWidth()
-                .combinedClickable(
-                    onClick = { onClick(packageName) },
-                    onLongClick = {
-                        expanded = true
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                    },
-                )
-                .pointerInteropFilter {
-                    if (it.action == MotionEvent.ACTION_DOWN) {
-                        touchPoint = Offset(it.x, it.y)
-                    }
-                    false
-                }
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-        ) {
-            AppIcon(packageInfo, iconModifier.size(48.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            AppContent(
-                label = label,
-                versionName = versionName,
-                versionCode = versionCode,
-                isAppEnabled = isAppEnabled,
-                isAppRunning = isAppRunning,
-                serviceStatus = appServiceStatus,
-            )
-            val offset = with(density) {
-                DpOffset(touchPoint.x.toDp(), -touchPoint.y.toDp())
+    val animatedColor = animateColorAsState(
+        targetValue = if (isSelected) MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.background,
+        animationSpec = tween(300, 0, LinearEasing),
+        label = "color",
+    )
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+            .semantics(mergeDescendants = true) {
+                selected = isSelected
             }
-            AppListItemMenuList(
-                expanded = expanded,
-                offset = offset,
-                isAppRunning = isAppRunning,
-                isAppEnabled = isAppEnabled,
-                onClearCacheClick = { onClearCacheClick(packageName) },
-                onClearDataClick = { onClearDataClick(packageName) },
-                onForceStopClick = { onForceStopClick(packageName) },
-                onUninstallClick = { onUninstallClick(packageName) },
-                onEnableClick = { onEnableClick(packageName) },
-                onDisableClick = { onDisableClick(packageName) },
-                onDismissRequest = { expanded = false },
+            .fillMaxWidth()
+            .combinedClickable(
+                onClick = { onClick(packageName) },
+                onLongClick = {
+                    expanded = true
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
             )
+            .pointerInteropFilter {
+                if (it.action == MotionEvent.ACTION_DOWN) {
+                    touchPoint = Offset(it.x, it.y)
+                }
+                false
+            }
+            .background(
+                color = animatedColor.value,
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        AppIcon(packageInfo, iconModifier.size(48.dp))
+        Spacer(modifier = Modifier.width(16.dp))
+        AppContent(
+            label = label,
+            versionName = versionName,
+            versionCode = versionCode,
+            isAppEnabled = isAppEnabled,
+            isAppRunning = isAppRunning,
+            serviceStatus = appServiceStatus,
+        )
+        val offset = with(density) {
+            DpOffset(touchPoint.x.toDp(), -touchPoint.y.toDp())
         }
+        AppListItemMenuList(
+            expanded = expanded,
+            offset = offset,
+            isAppRunning = isAppRunning,
+            isAppEnabled = isAppEnabled,
+            onClearCacheClick = { onClearCacheClick(packageName) },
+            onClearDataClick = { onClearDataClick(packageName) },
+            onForceStopClick = { onForceStopClick(packageName) },
+            onUninstallClick = { onUninstallClick(packageName) },
+            onEnableClick = { onEnableClick(packageName) },
+            onDisableClick = { onDisableClick(packageName) },
+            onDismissRequest = { expanded = false },
+        )
     }
 }
 
@@ -202,7 +217,11 @@ private fun AppContent(
             }
         }
         BlockerBodyMediumText(
-            text = stringResource(id = string.core_ui_version_code_template, versionName, versionCode),
+            text = stringResource(
+                id = string.core_ui_version_code_template,
+                versionName,
+                versionCode,
+            ),
         )
         if (serviceStatus != null) {
             BlockerBodyMediumText(
@@ -218,8 +237,8 @@ private fun AppContent(
 }
 
 @Composable
-@ThemePreviews
-fun AppListItemPreview(
+@PreviewThemes
+private fun AppListItemPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -241,7 +260,7 @@ fun AppListItemPreview(
 
 @Composable
 @Preview
-fun AppListItemWithoutServiceInfoPreview(
+private fun AppListItemWithoutServiceInfoPreview(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -263,7 +282,7 @@ fun AppListItemWithoutServiceInfoPreview(
 
 @Composable
 @Preview
-fun AppListItemWithLongAppName(
+private fun AppListItemWithLongAppName(
     @PreviewParameter(AppListPreviewParameterProvider::class)
     appList: List<AppItem>,
 ) {
@@ -278,6 +297,7 @@ fun AppListItemWithLongAppName(
                 isAppRunning = appList[2].isRunning,
                 packageInfo = appList[2].packageInfo,
                 appServiceStatus = appList[2].appServiceStatus,
+                isSelected = true,
             )
         }
     }

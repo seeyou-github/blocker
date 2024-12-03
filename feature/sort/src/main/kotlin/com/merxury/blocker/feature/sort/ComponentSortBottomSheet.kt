@@ -37,9 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.merxury.blocker.core.designsystem.component.ThemePreviews
+import com.merxury.blocker.core.designsystem.component.PreviewThemes
 import com.merxury.blocker.core.designsystem.segmentedbuttons.SegmentedButtons
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
+import com.merxury.blocker.core.model.data.ComponentSortInfo
 import com.merxury.blocker.core.model.preference.ComponentShowPriority
 import com.merxury.blocker.core.model.preference.ComponentShowPriority.DISABLED_COMPONENTS_FIRST
 import com.merxury.blocker.core.model.preference.ComponentShowPriority.ENABLED_COMPONENTS_FIRST
@@ -61,7 +62,7 @@ import com.merxury.blocker.feature.sort.R.string
 fun ComponentSortBottomSheetRoute(
     dismissHandler: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: SortViewModel = hiltViewModel(),
+    viewModel: ComponentSortViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.componentSortInfoUiState.collectAsStateWithLifecycle()
     val skipPartiallyExpanded by remember { mutableStateOf(false) }
@@ -135,7 +136,7 @@ fun SortOptionsContent(
             text = stringResource(id = string.feature_sort_sort_options),
             style = MaterialTheme.typography.headlineSmall,
             textAlign = TextAlign.Center,
-            modifier = modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
         )
         ItemHeader(title = stringResource(id = string.feature_sort_sort_by))
         SegmentedButtons(
@@ -160,8 +161,8 @@ fun SortOptionsContent(
 }
 
 @Composable
-@ThemePreviews
-fun SortOptionsBottomSheetPreview() {
+@PreviewThemes
+private fun SortOptionsBottomSheetPreview() {
     BlockerTheme {
         Surface {
             ComponentSortBottomSheet(
@@ -172,8 +173,8 @@ fun SortOptionsBottomSheetPreview() {
 }
 
 @Composable
-@ThemePreviews
-fun SortOptionsBottomSheetLoadingPreview() {
+@PreviewThemes
+private fun SortOptionsBottomSheetLoadingPreview() {
     BlockerTheme {
         Surface {
             ComponentSortBottomSheet(
