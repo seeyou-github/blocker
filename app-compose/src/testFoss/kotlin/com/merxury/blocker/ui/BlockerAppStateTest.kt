@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Blocker
+ * Copyright 2025 Blocker
  * Copyright 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,6 +36,8 @@ import com.merxury.blocker.core.data.util.PermissionStatus.NO_PERMISSION
 import com.merxury.blocker.core.testing.util.TestNetworkMonitor
 import com.merxury.blocker.core.testing.util.TestPermissionMonitor
 import com.merxury.blocker.core.testing.util.TestTimeZoneMonitor
+import dagger.hilt.android.testing.HiltAndroidTest
+import dagger.hilt.android.testing.HiltTestApplication
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -43,16 +45,18 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.datetime.TimeZone
 import org.junit.Rule
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
  * Tests [BlockerAppState].
- *
- * Note: This could become an unit test if Robolectric is added to the project and the Context
- * is faked.
  */
-@OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+@RunWith(RobolectricTestRunner::class)
+@Config(application = HiltTestApplication::class)
+@HiltAndroidTest
 class BlockerAppStateTest {
 
     @get:Rule
@@ -138,27 +142,26 @@ class BlockerAppStateTest {
     }
 
     @Test
-    fun blockerAppState_WhenPermissionMonitorCantGetPermission_StateIsNoPermission() =
-        runTest(UnconfinedTestDispatcher()) {
-            composeTestRule.setContent {
-                val bottomSheetNavigator = rememberBottomSheetNavigator()
-                state = BlockerAppState(
-                    bottomSheetNavigator = bottomSheetNavigator,
-                    navController = NavHostController(LocalContext.current),
-                    networkMonitor = networkMonitor,
-                    permissionMonitor = permissionMonitor,
-                    coroutineScope = backgroundScope,
-                    timeZoneMonitor = timeZoneMonitor,
-                )
-            }
-
-            backgroundScope.launch { state.currentPermission.collect() }
-            permissionMonitor.setPermission(NO_PERMISSION)
-            assertEquals(
-                NO_PERMISSION,
-                state.currentPermission.value,
+    fun blockerAppState_WhenPermissionMonitorCantGetPermission_StateIsNoPermission() = runTest(UnconfinedTestDispatcher()) {
+        composeTestRule.setContent {
+            val bottomSheetNavigator = rememberBottomSheetNavigator()
+            state = BlockerAppState(
+                bottomSheetNavigator = bottomSheetNavigator,
+                navController = NavHostController(LocalContext.current),
+                networkMonitor = networkMonitor,
+                permissionMonitor = permissionMonitor,
+                coroutineScope = backgroundScope,
+                timeZoneMonitor = timeZoneMonitor,
             )
         }
+
+        backgroundScope.launch { state.currentPermission.collect() }
+        permissionMonitor.setPermission(NO_PERMISSION)
+        assertEquals(
+            NO_PERMISSION,
+            state.currentPermission.value,
+        )
+    }
 
     @Test
     fun blockerAppState_differentTZ_withTimeZoneMonitorChange() = runTest(UnconfinedTestDispatcher()) {
@@ -181,6 +184,7 @@ class BlockerAppStateTest {
         )
     }
 
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     private fun getCompactWindowClass() = WindowSizeClass.calculateFromSize(DpSize(500.dp, 300.dp))
 }
 

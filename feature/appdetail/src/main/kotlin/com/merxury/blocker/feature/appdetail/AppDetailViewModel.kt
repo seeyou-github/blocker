@@ -1,5 +1,5 @@
 /*
- * Copyright 2024 Blocker
+ * Copyright 2025 Blocker
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -868,13 +868,12 @@ class AppDetailViewModel @Inject constructor(
         }
     }
 
-    private suspend fun getSeedColor(packageInfo: PackageInfo?): Color? =
-        withContext(ioDispatcher) {
-            val icon: Drawable? = packageInfo?.applicationInfo?.loadIcon(pm)
-            return@withContext icon?.toBitmap()
-                ?.asImageBitmap()
-                ?.themeColorOrNull()
-        }
+    private suspend fun getSeedColor(packageInfo: PackageInfo?): Color? = withContext(ioDispatcher) {
+        val icon: Drawable? = packageInfo?.applicationInfo?.loadIcon(pm)
+        return@withContext icon?.toBitmap()
+            ?.asImageBitmap()
+            ?.themeColorOrNull()
+    }
 
     fun zipAllRule() = zipAllRuleUseCase()
 
