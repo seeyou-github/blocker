@@ -74,7 +74,7 @@ internal class ShizukuServiceController @Inject constructor(
 
     override suspend fun stopService(packageName: String, serviceName: String): Boolean {
         val intent = Intent().apply {
-            setComponent(ComponentName(packageName, serviceName))
+            component = ComponentName(packageName, serviceName)
         }
         val result = am.stopService(null, intent, intent.type, context.userId)
         return when (result) {
@@ -85,7 +85,7 @@ internal class ShizukuServiceController @Inject constructor(
 
             1 -> {
                 Timber.i("Service $packageName/$serviceName stopped")
-                false
+                true
             }
 
             -1 -> {
@@ -99,7 +99,7 @@ internal class ShizukuServiceController @Inject constructor(
 
     override suspend fun startService(packageName: String, serviceName: String): Boolean {
         val intent = Intent().apply {
-            setComponent(ComponentName(packageName, serviceName))
+            component = ComponentName(packageName, serviceName)
         }
         val cn = am.startService(
             null,

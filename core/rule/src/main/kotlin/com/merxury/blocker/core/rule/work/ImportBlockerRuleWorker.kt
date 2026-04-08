@@ -19,7 +19,7 @@ package com.merxury.blocker.core.rule.work
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.PackageManager
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.work.HiltWorker
 import androidx.work.OneTimeWorkRequestBuilder
@@ -42,7 +42,7 @@ import com.merxury.blocker.core.rule.R
 import com.merxury.blocker.core.rule.entity.RuleWorkResult
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.PARAM_WORK_RESULT
 import com.merxury.blocker.core.rule.util.StorageUtil
-import com.merxury.blocker.core.utils.ApplicationUtil
+import com.merxury.blocker.core.utils.PackageInfoDataSource
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -57,6 +57,7 @@ class ImportBlockerRuleWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
     private val pm: PackageManager,
+    private val packageInfoDataSource: PackageInfoDataSource,
     @RootApiControl private val rootController: IController,
     @IfwControl private val ifwController: IController,
     @ShizukuControl private val shizukuController: IController,
@@ -86,7 +87,7 @@ class ImportBlockerRuleWorker @AssistedInject constructor(
         val packageManager = context.packageManager
         val backupPackageName = inputData.getString(PARAM_BACKUP_PACKAGE_NAME)
         val shouldRestoreSystemApp = inputData.getBoolean(PARAM_RESTORE_SYS_APPS, false)
-        val documentDir = DocumentFile.fromTreeUri(context, Uri.parse(backupPath))
+        val documentDir = DocumentFile.fromTreeUri(context, backupPath.toUri())
         if (documentDir == null) {
             Timber.e("Cannot create DocumentFile")
             return@withContext Result.failure()
@@ -111,8 +112,8 @@ class ImportBlockerRuleWorker @AssistedInject constructor(
                 context.contentResolver.openInputStream(it.uri)?.use { input ->
                     val rule = json.decodeFromStream<BlockerRule>(input)
                     val appInstalled =
-                        ApplicationUtil.isAppInstalled(packageManager, rule.packageName)
-                    val isSystemApp = ApplicationUtil.isSystemApp(packageManager, rule.packageName)
+                        packageInfoDataSource.isAppInstalled(rule.packageName)
+                    val isSystemApp = packageInfoDataSource.isSystemApp(rule.packageName)
                     if (!appInstalled) {
                         Timber.w("App ${rule.packageName} is not installed, skipping")
                         current++
@@ -151,7 +152,7 @@ class ImportBlockerRuleWorker @AssistedInject constructor(
         packageName: String,
         controllerType: ControllerType,
     ): Result {
-        val appInstalled = ApplicationUtil.isAppInstalled(pm, packageName)
+        val appInstalled = packageInfoDataSource.isAppInstalled(packageName)
         if (!appInstalled) {
             Timber.w("App $packageName is not installed, skipping")
             return Result.failure()
@@ -212,8 +213,7 @@ class ImportBlockerRuleWorker @AssistedInject constructor(
                 }
                 count++
             } else {
-                val currentState = ApplicationUtil.checkComponentIsEnabled(
-                    pm,
+                val currentState = packageInfoDataSource.checkComponentIsEnabled(
                     ComponentName(it.packageName, it.name),
                 )
                 if (currentState == it.state) return@forEach

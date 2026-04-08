@@ -18,7 +18,6 @@
 package com.merxury.blocker
 
 import com.android.build.api.dsl.CommonExtension
-import com.android.build.api.dsl.ManagedVirtualDevice
 import org.gradle.kotlin.dsl.get
 import org.gradle.kotlin.dsl.invoke
 
@@ -26,20 +25,21 @@ import org.gradle.kotlin.dsl.invoke
  * Configure project for Gradle managed devices
  */
 internal fun configureGradleManagedDevices(
-    commonExtension: CommonExtension<*, *, *, *, *, *>,
+    commonExtension: CommonExtension,
 ) {
     val pixel4 = DeviceConfig("Pixel 4", 30, "aosp-atd")
     val pixel6 = DeviceConfig("Pixel 6", 31, "aosp")
     val pixelC = DeviceConfig("Pixel C", 30, "aosp-atd")
 
-    val allDevices = listOf(pixel4, pixel6, pixelC)
-    val ciDevices = listOf(pixel4, pixelC)
+    val allDevicesList = listOf(pixel4, pixel6, pixelC)
+    val ciDevicesList = listOf(pixel4, pixelC)
 
-    commonExtension.testOptions {
+    commonExtension.testOptions.apply {
+        @Suppress("UnstableApiUsage")
         managedDevices {
-            devices {
-                allDevices.forEach { deviceConfig ->
-                    maybeCreate(deviceConfig.taskName, ManagedVirtualDevice::class.java).apply {
+            localDevices {
+                allDevicesList.forEach { deviceConfig ->
+                    maybeCreate(deviceConfig.taskName).apply {
                         device = deviceConfig.device
                         apiLevel = deviceConfig.apiLevel
                         systemImageSource = deviceConfig.systemImageSource
@@ -48,8 +48,8 @@ internal fun configureGradleManagedDevices(
             }
             groups {
                 maybeCreate("ci").apply {
-                    ciDevices.forEach { deviceConfig ->
-                        targetDevices.add(devices[deviceConfig.taskName])
+                    ciDevicesList.forEach { deviceConfig ->
+                        targetDevices.add(localDevices[deviceConfig.taskName])
                     }
                 }
             }

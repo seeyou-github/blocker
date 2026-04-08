@@ -18,6 +18,7 @@ plugins {
     alias(libs.plugins.blocker.android.library)
     alias(libs.plugins.blocker.android.library.jacoco)
     alias(libs.plugins.blocker.android.hilt)
+    alias(libs.plugins.kotlin.serialization)
     id("kotlin-parcelize")
 }
 
@@ -28,12 +29,15 @@ android {
 dependencies {
     api(libs.timber)
     api(libs.kotlinx.datetime)
+    implementation(projects.core.model)
     implementation(libs.hiddenapibypass)
     implementation(libs.libsu.core)
     implementation(libs.libsu.io)
-
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext)
+    testImplementation(kotlin("test"))
 }
 
 java {

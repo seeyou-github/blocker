@@ -18,6 +18,7 @@ package com.merxury.blocker.core.rule.work
 
 import android.content.Context
 import android.net.Uri
+import androidx.core.net.toUri
 import androidx.hilt.work.HiltWorker
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
@@ -25,6 +26,7 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import com.merxury.blocker.core.controllers.IController
+import com.merxury.blocker.core.controllers.di.CombinedControl
 import com.merxury.blocker.core.controllers.di.IfwControl
 import com.merxury.blocker.core.controllers.di.RootApiControl
 import com.merxury.blocker.core.controllers.di.ShizukuControl
@@ -34,6 +36,7 @@ import com.merxury.blocker.core.model.ComponentType.ACTIVITY
 import com.merxury.blocker.core.model.data.ComponentInfo
 import com.merxury.blocker.core.model.data.ControllerType
 import com.merxury.blocker.core.model.data.ControllerType.IFW
+import com.merxury.blocker.core.model.data.ControllerType.IFW_PLUS_PM
 import com.merxury.blocker.core.model.data.ControllerType.PM
 import com.merxury.blocker.core.model.data.ControllerType.SHIZUKU
 import com.merxury.blocker.core.rule.R
@@ -41,7 +44,7 @@ import com.merxury.blocker.core.rule.entity.RuleWorkResult.MISSING_ROOT_PERMISSI
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.MISSING_STORAGE_PERMISSION
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.PARAM_WORK_RESULT
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.UNEXPECTED_EXCEPTION
-import com.merxury.blocker.core.utils.ApplicationUtil
+import com.merxury.blocker.core.utils.PackageInfoDataSource
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -53,9 +56,11 @@ import java.io.IOException
 class ImportMatRulesWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
+    private val packageInfoDataSource: PackageInfoDataSource,
     @IfwControl private val ifwController: IController,
     @RootApiControl private val rootController: IController,
     @ShizukuControl private val shizukuController: IController,
+    @CombinedControl private val combinedController: IController,
     @Dispatcher(IO) private val ioDispatcher: CoroutineDispatcher,
 ) : RuleNotificationWorker(context, params) {
 
@@ -64,7 +69,7 @@ class ImportMatRulesWorker @AssistedInject constructor(
     override fun getNotificationTitle(): Int = R.string.core_rule_import_mat_rule_please_wait
 
     override suspend fun doWork(): Result = withContext(ioDispatcher) {
-        val uri = Uri.parse(uriString)
+        val uri = uriString?.toUri()
         if (uri == null) {
             Timber.e("File URI is null, cannot import MAT rules")
             return@withContext Result.failure(
@@ -76,6 +81,7 @@ class ImportMatRulesWorker @AssistedInject constructor(
             IFW -> ifwController
             PM -> rootController
             SHIZUKU -> shizukuController
+            IFW_PLUS_PM -> combinedController
         }
         val shouldRestoreSystemApps = inputData.getBoolean(PARAM_RESTORE_SYS_APPS, false)
         val uninstalledAppList = mutableListOf<String>()
@@ -95,8 +101,7 @@ class ImportMatRulesWorker @AssistedInject constructor(
                     if (isApplicationUninstalled(context, uninstalledAppList, packageName)) {
                         return@forEach
                     }
-                    val isSystemApp = ApplicationUtil.isSystemApp(
-                        context.packageManager,
+                    val isSystemApp = packageInfoDataSource.isSystemApp(
                         packageName,
                     )
                     if (!shouldRestoreSystemApps && isSystemApp) {
@@ -142,7 +147,7 @@ class ImportMatRulesWorker @AssistedInject constructor(
         if (savedList.contains(packageName)) {
             return true
         }
-        if (!ApplicationUtil.isAppInstalled(context.packageManager, packageName)) {
+        if (!packageInfoDataSource.isAppInstalled(packageName)) {
             savedList.add(packageName)
             return true
         }

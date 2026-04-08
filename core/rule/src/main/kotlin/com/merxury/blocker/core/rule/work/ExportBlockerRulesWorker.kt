@@ -20,6 +20,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.pm.PackageInfoCompat
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.work.HiltWorker
 import androidx.work.OneTimeWorkRequestBuilder
@@ -41,7 +42,7 @@ import com.merxury.blocker.core.rule.R
 import com.merxury.blocker.core.rule.entity.RuleWorkResult
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.PARAM_WORK_RESULT
 import com.merxury.blocker.core.rule.util.StorageUtil
-import com.merxury.blocker.core.utils.ApplicationUtil
+import com.merxury.blocker.core.utils.PackageInfoDataSource
 import com.merxury.core.ifw.IIntentFirewall
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -57,6 +58,7 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
     private val intentFirewall: IIntentFirewall,
+    private val packageInfoDataSource: PackageInfoDataSource,
     private val json: Json,
     @Dispatcher(IO) private val ioDispatcher: CoroutineDispatcher,
 ) : RuleNotificationWorker(context, params) {
@@ -98,14 +100,14 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
             var current = 1
             try {
                 val list = if (shouldBackupSystemApp) {
-                    ApplicationUtil.getApplicationList(context)
+                    packageInfoDataSource.getApplicationList()
                 } else {
-                    ApplicationUtil.getThirdPartyApplicationList(context)
+                    packageInfoDataSource.getThirdPartyApplicationList()
                 }
                 val total = list.count()
                 list.forEach {
                     setForeground(updateNotification(it.packageName, current, total))
-                    export(it.packageName, Uri.parse(backupPath))
+                    export(it.packageName, backupPath.toUri())
                     current++
                 }
             } catch (e: Exception) {
@@ -125,13 +127,12 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
     private suspend fun backupSingleApp(packageName: String, backupPath: String) {
         Timber.d("Start to backup app rules for $packageName")
         setForeground(updateNotification(packageName, 1, 1))
-        export(packageName, Uri.parse(backupPath))
+        export(packageName, backupPath.toUri())
     }
 
     private suspend fun export(packageName: String, destUri: Uri): Boolean {
         Timber.i("Export Blocker rules for $packageName")
-        val pm = context.packageManager
-        val applicationInfo = ApplicationUtil.getApplicationComponents(pm, packageName)
+        val applicationInfo = packageInfoDataSource.getApplicationComponents(packageName)
         val rule = BlockerRule(
             packageName = applicationInfo.packageName,
             versionName = applicationInfo.versionName,
@@ -140,8 +141,7 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
         try {
             applicationInfo.receivers?.forEach {
                 val stateIFW = intentFirewall.getComponentEnableState(it.packageName, it.name)
-                val statePM = ApplicationUtil.checkComponentIsEnabled(
-                    pm,
+                val statePM = packageInfoDataSource.checkComponentIsEnabled(
                     ComponentName(it.packageName, it.name),
                 )
                 rule.components.add(
@@ -165,8 +165,7 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
             }
             applicationInfo.services?.forEach {
                 val stateIFW = intentFirewall.getComponentEnableState(it.packageName, it.name)
-                val statePM = ApplicationUtil.checkComponentIsEnabled(
-                    pm,
+                val statePM = packageInfoDataSource.checkComponentIsEnabled(
                     ComponentName(it.packageName, it.name),
                 )
                 rule.components.add(
@@ -190,8 +189,7 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
             }
             applicationInfo.activities?.forEach {
                 val stateIFW = intentFirewall.getComponentEnableState(it.packageName, it.name)
-                val statePM = ApplicationUtil.checkComponentIsEnabled(
-                    pm,
+                val statePM = packageInfoDataSource.checkComponentIsEnabled(
                     ComponentName(it.packageName, it.name),
                 )
                 rule.components.add(
@@ -214,8 +212,7 @@ class ExportBlockerRulesWorker @AssistedInject constructor(
                 )
             }
             applicationInfo.providers?.forEach {
-                val statePM = ApplicationUtil.checkComponentIsEnabled(
-                    pm,
+                val statePM = packageInfoDataSource.checkComponentIsEnabled(
                     ComponentName(it.packageName, it.name),
                 )
                 rule.components.add(

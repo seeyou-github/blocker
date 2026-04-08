@@ -26,14 +26,10 @@ android {
         consumerProguardFiles("consumer-proguard-rules.pro")
     }
     namespace = "com.merxury.blocker.core.controller"
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
     buildFeatures {
         aidl = true
     }
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 
 dependencies {
@@ -50,4 +46,5 @@ dependencies {
     implementation(libs.shizuku.provider)
 
     testImplementation(projects.core.testing)
+    testImplementation(libs.robolectric)
 }

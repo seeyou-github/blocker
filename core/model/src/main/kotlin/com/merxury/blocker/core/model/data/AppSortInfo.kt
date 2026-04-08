@@ -20,9 +20,10 @@ import com.merxury.blocker.core.model.preference.AppSorting
 import com.merxury.blocker.core.model.preference.AppSorting.NAME
 import com.merxury.blocker.core.model.preference.SortingOrder
 import com.merxury.blocker.core.model.preference.SortingOrder.ASCENDING
+import com.merxury.blocker.core.model.preference.TopAppType
 
 data class AppSortInfo(
     val sorting: AppSorting = NAME,
     val order: SortingOrder = ASCENDING,
-    val showRunningAppsOnTop: Boolean = false,
+    val topAppType: TopAppType = TopAppType.NONE,
 )

@@ -18,6 +18,7 @@
 package com.merxury.blocker.sync.workers
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.hilt.work.HiltWorker
 import androidx.tracing.traceAsync
 import androidx.work.CoroutineWorker
@@ -35,11 +36,11 @@ import com.merxury.blocker.core.datastore.ChangeListVersions
 import com.merxury.blocker.core.di.FilesDir
 import com.merxury.blocker.core.dispatchers.BlockerDispatchers.IO
 import com.merxury.blocker.core.dispatchers.Dispatcher
-import com.merxury.blocker.core.git.DefaultGitClient
+import com.merxury.blocker.core.git.GitClient
 import com.merxury.blocker.core.git.RepositoryInfo
 import com.merxury.blocker.core.network.BlockerNetworkDataSource
 import com.merxury.blocker.core.rule.work.CopyRulesToStorageWorker
-import com.merxury.blocker.core.utils.ApplicationUtil
+import com.merxury.blocker.core.utils.AppDebugChecker
 import com.merxury.blocker.sync.initializers.SyncConstraints
 import com.merxury.blocker.sync.initializers.syncForegroundInfo
 import com.merxury.blocker.sync.status.ISyncSubscriber
@@ -50,9 +51,9 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.takeWhile
 import kotlinx.coroutines.withContext
-import kotlinx.datetime.Instant
 import timber.log.Timber
 import java.io.File
+import kotlin.time.Instant
 
 private const val PREF_SYNC_RULE = "sync_rule"
 private const val PREF_LAST_SYNCED_TIME = "last_synced_time"
@@ -73,6 +74,8 @@ internal class SyncWorker @AssistedInject constructor(
     @Dispatcher(IO) private val ioDispatcher: CoroutineDispatcher,
     private val analyticsHelper: AnalyticsHelper,
     private val syncSubscriber: ISyncSubscriber,
+    private val appDebugChecker: AppDebugChecker,
+    private val gitClientFactory: GitClient.Factory,
 ) : CoroutineWorker(appContext, workerParams),
     Synchronizer {
 
@@ -129,7 +132,7 @@ internal class SyncWorker @AssistedInject constructor(
             repoName = provider.projectName,
             branch = mainBranchName,
         )
-        val gitClient = DefaultGitClient(repoInfo, filesDir)
+        val gitClient = gitClientFactory.create(repoInfo, filesDir)
         // Detect the folder is a git repository or not
         val projectFolder = filesDir.resolve(repoInfo.repoName)
         val gitFolder = projectFolder.resolve(".git")
@@ -139,21 +142,28 @@ internal class SyncWorker @AssistedInject constructor(
                     // Repo not initialized, delete the folder and clone again
                     Timber.i("Local rule folder is not a git repository, delete and clone again")
                     projectFolder.deleteRecursively()
-                    gitClient.setRemote(repoInfo.url, provider.name)
                     gitClient.cloneRepository()
                 } else {
-                    // Repo initialized, pull the latest changes
-                    gitClient.setRemote(repoInfo.url, provider.name)
-                    gitClient.pull()
+                    val trackingRemote = gitClient.getTrackingRemote()
+                    if (trackingRemote != null && trackingRemote != provider.name) {
+                        Timber.i(
+                            "Provider changed from $trackingRemote to ${provider.name}," +
+                                " switching remote",
+                        )
+                        gitClient.setRemote(repoInfo.url, provider.name)
+                        gitClient.resetToRemote(provider.name, mainBranchName)
+                    } else {
+                        gitClient.setRemote(repoInfo.url, provider.name)
+                        gitClient.pull()
+                    }
                 }
             } else {
                 // Repo not exists, clone the repository
-                gitClient.setRemote(repoInfo.url, provider.name)
                 gitClient.cloneRepository()
             }
         } catch (e: Exception) {
             // If it is in the debug mode, throw the exception
-            if (ApplicationUtil.isDebugMode(appContext)) {
+            if (appDebugChecker.isDebugMode()) {
                 throw e
             }
             Timber.e(e, "Failed to sync rules from remote")
@@ -168,7 +178,7 @@ internal class SyncWorker @AssistedInject constructor(
 
     // Only run this worker in the first run in a day
     private fun shouldRunTask(): Boolean {
-        if (ApplicationUtil.isDebugMode(appContext)) {
+        if (appDebugChecker.isDebugMode()) {
             Timber.d("Should run sync task in debug mode each time when app launches")
             return true
         }
@@ -192,7 +202,7 @@ internal class SyncWorker @AssistedInject constructor(
         val sharedPreferences =
             appContext.getSharedPreferences(PREF_SYNC_RULE, Context.MODE_PRIVATE)
         val currentTime = System.currentTimeMillis()
-        sharedPreferences.edit().putLong(PREF_LAST_SYNCED_TIME, currentTime).apply()
+        sharedPreferences.edit { putLong(PREF_LAST_SYNCED_TIME, currentTime) }
         Timber.d("Mark rule sync time: ${Instant.fromEpochMilliseconds(currentTime)}")
     }
 

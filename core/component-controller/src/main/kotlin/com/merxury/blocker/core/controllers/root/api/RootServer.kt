@@ -38,6 +38,7 @@ import timber.log.Timber
 private const val MAX_SERVICE_COUNT = 10000
 
 internal class RootServer : RootService() {
+
     override fun onCreate() {
         super.onCreate()
         Timber.d("RootService onCreate")
@@ -64,7 +65,9 @@ internal class RootServer : RootService() {
         Timber.d("RootService onDestroy")
     }
 
-    class Ipc(private val context: Context) : IRootService.Stub() {
+    class Ipc(
+        private val context: Context,
+    ) : IRootService.Stub() {
         private var serviceList: List<ActivityManager.RunningServiceInfo> = listOf()
         private var currentRunningProcess = mutableListOf<ActivityManager.RunningAppProcessInfo>()
 
@@ -226,7 +229,7 @@ internal class RootServer : RootService() {
                 return false
             }
             val intent = Intent().apply {
-                setComponent(ComponentName(packageName, serviceName))
+                component = ComponentName(packageName, serviceName)
             }
             val cn = am.startService(
                 null,
@@ -260,7 +263,7 @@ internal class RootServer : RootService() {
                 return false
             }
             val intent = Intent().apply {
-                setComponent(ComponentName(packageName, serviceName))
+                component = ComponentName(packageName, serviceName)
             }
             val result = am.stopService(null, intent, intent.type, context.userId)
             return when (result) {
@@ -271,7 +274,7 @@ internal class RootServer : RootService() {
 
                 1 -> {
                     Timber.i("Service $packageName/$serviceName stopped")
-                    false
+                    true
                 }
 
                 -1 -> {

@@ -23,11 +23,7 @@ plugins {
 
 android {
     namespace = "com.merxury.blocker.core.data"
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
+    testOptions.unitTests.isIncludeAndroidResources = true
 }
 dependencies {
     api(projects.core.common)
@@ -43,4 +39,5 @@ dependencies {
     testImplementation(projects.core.testing)
     testImplementation(projects.core.datastoreTest)
     testImplementation(libs.mockito.kotlin)
+    testImplementation(libs.turbine)
 }

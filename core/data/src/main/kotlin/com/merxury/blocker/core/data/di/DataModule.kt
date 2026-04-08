@@ -26,6 +26,8 @@ import com.merxury.blocker.core.data.respository.component.ComponentRepository
 import com.merxury.blocker.core.data.respository.component.LocalComponentRepository
 import com.merxury.blocker.core.data.respository.componentdetail.ComponentDetailRepository
 import com.merxury.blocker.core.data.respository.componentdetail.LocalComponentDetailRepository
+import com.merxury.blocker.core.data.respository.debloater.DebloatableComponentRepository
+import com.merxury.blocker.core.data.respository.debloater.LocalDebloatableComponentRepository
 import com.merxury.blocker.core.data.respository.generalrule.GeneralRuleDataSource
 import com.merxury.blocker.core.data.respository.generalrule.GeneralRuleRepository
 import com.merxury.blocker.core.data.respository.generalrule.LocalGeneralRuleDataSource
@@ -110,4 +112,9 @@ abstract class DataModule {
     internal abstract fun bindLicensesRepository(
         licensesRepository: LocalLicensesRepository,
     ): LicensesRepository
+
+    @Binds
+    internal abstract fun bindDebloatableComponentRepository(
+        debloatableComponentRepository: LocalDebloatableComponentRepository,
+    ): DebloatableComponentRepository
 }

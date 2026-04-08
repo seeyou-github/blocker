@@ -17,6 +17,7 @@
 package com.merxury.blocker
 
 import com.android.build.api.artifact.ScopedArtifact
+import com.android.build.api.dsl.CommonExtension
 import com.android.build.api.variant.AndroidComponentsExtension
 import com.android.build.api.variant.ScopedArtifacts
 import com.android.build.api.variant.SourceDirectories
@@ -26,8 +27,11 @@ import org.gradle.api.file.RegularFile
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.testing.Test
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
 import org.gradle.kotlin.dsl.assign
 import org.gradle.kotlin.dsl.configure
+import org.gradle.kotlin.dsl.getByType
 import org.gradle.kotlin.dsl.register
 import org.gradle.kotlin.dsl.withType
 import org.gradle.testing.jacoco.plugins.JacocoPluginExtension
@@ -60,8 +64,14 @@ private fun String.capitalize() = replaceFirstChar {
  * tests on CI using a different Github Action or an external device farm.
  */
 internal fun Project.configureJacoco(
+    commonExtension: CommonExtension,
     androidComponentsExtension: AndroidComponentsExtension<*, *, *>,
 ) {
+    commonExtension.buildTypes.named("debug") {
+        enableAndroidTestCoverage = true
+        enableUnitTestCoverage = true
+    }
+
     configure<JacocoPluginExtension> {
         toolVersion = libs.findVersion("jacoco").get().toString()
     }
@@ -120,7 +130,13 @@ internal fun Project.configureJacoco(
                 { _ -> allDirectories },
             )
     }
+    val toolchains = extensions.getByType(JavaToolchainService::class)
     tasks.withType<Test>().configureEach {
+        // Fix java.lang.UnsupportedOperationException:
+        // Failed to create a Robolectric sandbox: Android SDK 36 requires Java 21 (have Java 17)
+        javaLauncher.set(toolchains.launcherFor {
+            languageVersion.set(JavaLanguageVersion.of(21))
+        })
         configure<JacocoTaskExtension> {
             // Required for JaCoCo + Robolectric
             // https://github.com/robolectric/robolectric/issues/2230

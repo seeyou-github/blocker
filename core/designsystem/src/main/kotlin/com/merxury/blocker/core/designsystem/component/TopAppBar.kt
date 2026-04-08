@@ -34,13 +34,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.merxury.blocker.core.designsystem.icon.BlockerActionIcon
 import com.merxury.blocker.core.designsystem.icon.BlockerIcons
 import com.merxury.blocker.core.designsystem.theme.BlockerTheme
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,7 +82,9 @@ fun BlockerTopAppBarWithProgress(
     title: String,
     modifier: Modifier = Modifier,
     progress: Float? = null,
+    actions: @Composable () -> Unit = {},
 ) {
+    val locale = LocalLocale.current.platformLocale
     TopAppBar(
         modifier = modifier,
         title = {
@@ -98,13 +100,14 @@ fun BlockerTopAppBarWithProgress(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = String.format(Locale.getDefault(), "%.0f%%", progress * 100),
+                        text = String.format(locale, "%.0f%%", progress * 100),
                     )
                     BlockerLoadingWheel(
                         modifier = Modifier.size(36.dp),
                     )
                 }
             }
+            actions()
         },
     )
 }
@@ -136,7 +139,7 @@ fun BlockerLargeTopAppBar(
         actions = {
             actions()
         },
-        colors = TopAppBarDefaults.largeTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             scrolledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),
@@ -168,7 +171,7 @@ fun BlockerMediumTopAppBar(
         actions = {
             actions()
         },
-        colors = TopAppBarDefaults.mediumTopAppBarColors(
+        colors = TopAppBarDefaults.topAppBarColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant,
             scrolledContainerColor = MaterialTheme.colorScheme.surfaceVariant,
         ),

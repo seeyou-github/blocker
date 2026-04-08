@@ -17,17 +17,12 @@
 plugins {
     alias(libs.plugins.blocker.android.library)
     alias(libs.plugins.blocker.android.library.jacoco)
-    id("kotlinx-serialization")
     alias(libs.plugins.blocker.android.hilt)
 }
 
 android {
     namespace = "com.merxury.blocker.core.ifw"
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
+    testOptions.unitTests.isIncludeAndroidResources = true
     defaultConfig {
         consumerProguardFiles("proguard-rules.pro")
     }
@@ -36,12 +31,9 @@ android {
 dependencies {
     implementation(projects.core.common)
     implementation(projects.core.model)
-    implementation(libs.kotlinx.serialization.json)
     implementation(libs.libsu.core)
     implementation(libs.libsu.io)
-    implementation(libs.xmlutil.core.android)
-    implementation(libs.xmlutil.serialization.android)
 
     testImplementation(projects.core.testing)
-    testImplementation(libs.kxml)
+    testImplementation(libs.robolectric)
 }

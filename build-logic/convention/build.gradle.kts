@@ -15,8 +15,6 @@
  * limitations under the License.
  */
 
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 plugins {
     `kotlin-dsl`
     alias(libs.plugins.android.lint)
@@ -26,7 +24,7 @@ group = "com.merxury.blocker.buildlogic"
 
 kotlin {
     compilerOptions {
-        jvmToolchain(17)
+        jvmToolchain(21)
     }
 }
 
@@ -40,6 +38,7 @@ dependencies {
     compileOnly(libs.ksp.gradlePlugin)
     compileOnly(libs.licensee.gradlePlugin)
     compileOnly(libs.room.gradlePlugin)
+    compileOnly(libs.spotless.gradlePlugin)
     implementation(libs.truth)
     lintChecks(libs.androidx.lint.gradle)
 }
@@ -65,6 +64,10 @@ gradlePlugin {
             id = libs.plugins.blocker.android.application.jacoco.get().pluginId
             implementationClass = "AndroidApplicationJacocoConventionPlugin"
         }
+        register("flashableApk") {
+            id = libs.plugins.blocker.flashable.apk.get().pluginId
+            implementationClass = "FlashableApkConventionPlugin"
+        }
         register("androidLibraryCompose") {
             id = libs.plugins.blocker.android.library.compose.get().pluginId
             implementationClass = "AndroidLibraryComposeConventionPlugin"
@@ -73,9 +76,13 @@ gradlePlugin {
             id = libs.plugins.blocker.android.library.asProvider().get().pluginId
             implementationClass = "AndroidLibraryConventionPlugin"
         }
-        register("androidFeature") {
-            id = libs.plugins.blocker.android.feature.get().pluginId
-            implementationClass = "AndroidFeatureConventionPlugin"
+        register("androidFeatureImpl") {
+            id = libs.plugins.blocker.android.feature.impl.get().pluginId
+            implementationClass = "AndroidFeatureImplConventionPlugin"
+        }
+        register("androidFeatureApi") {
+            id = libs.plugins.blocker.android.feature.api.get().pluginId
+            implementationClass = "AndroidFeatureApiConventionPlugin"
         }
         register("androidLibraryJacoco") {
             id = libs.plugins.blocker.android.library.jacoco.get().pluginId
@@ -108,6 +115,10 @@ gradlePlugin {
         register("jvmLibrary") {
             id = libs.plugins.blocker.jvm.library.get().pluginId
             implementationClass = "JvmLibraryConventionPlugin"
+        }
+        register("root") {
+            id = libs.plugins.blocker.root.get().pluginId
+            implementationClass = "RootPlugin"
         }
     }
 }

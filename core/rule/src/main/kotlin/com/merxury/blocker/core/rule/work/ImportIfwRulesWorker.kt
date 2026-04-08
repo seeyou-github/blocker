@@ -36,13 +36,13 @@ import com.merxury.blocker.core.rule.entity.RuleWorkResult.MISSING_STORAGE_PERMI
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.PARAM_WORK_RESULT
 import com.merxury.blocker.core.rule.entity.RuleWorkResult.UNEXPECTED_EXCEPTION
 import com.merxury.blocker.core.rule.util.StorageUtil
-import com.merxury.blocker.core.utils.ApplicationUtil
-import com.merxury.core.ifw.Rules
+import com.merxury.blocker.core.utils.PackageInfoDataSource
+import com.merxury.core.ifw.model.IfwComponentType
+import com.merxury.core.ifw.xml.IfwXmlDeserializer
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.withContext
-import nl.adaptivity.xmlutil.serialization.XML
 import timber.log.Timber
 import java.io.IOException
 
@@ -50,7 +50,8 @@ import java.io.IOException
 class ImportIfwRulesWorker @AssistedInject constructor(
     @Assisted private val context: Context,
     @Assisted params: WorkerParameters,
-    private val xmlParser: XML,
+    private val deserializer: IfwXmlDeserializer,
+    private val packageInfoDataSource: PackageInfoDataSource,
     @IfwControl private val ifwController: IController,
     @Dispatcher(IO) private val ioDispatcher: CoroutineDispatcher,
 ) : RuleNotificationWorker(context, params) {
@@ -74,7 +75,6 @@ class ImportIfwRulesWorker @AssistedInject constructor(
         var importedCount = 0
         try {
             val shouldRestoreSystemApps = inputData.getBoolean(PARAM_RESTORE_SYS_APPS, false)
-            // Check directory is readable
             val ifwFolder = StorageUtil.getOrCreateIfwFolder(context, folderPath)
                 ?: return@withContext Result.failure(
                     workDataOf(PARAM_WORK_RESULT to UNEXPECTED_EXCEPTION),
@@ -82,12 +82,9 @@ class ImportIfwRulesWorker @AssistedInject constructor(
             val files = ifwFolder.listFiles()
                 .filter { it.isFile && it.name?.endsWith(".xml") == true }
             total = files.count()
-            // Start importing files
             files.forEach { documentFile ->
                 val restoredPackage = inputData.getString(PARAM_RESTORE_PACKAGE_NAME)
                 if (!restoredPackage.isNullOrEmpty()) {
-                    // Import 1 IFW file case
-                    // It will follow the 'Restore system app' setting
                     if (documentFile.name != restoredPackage + IFW_EXTENSION) {
                         return@forEach
                     }
@@ -99,20 +96,19 @@ class ImportIfwRulesWorker @AssistedInject constructor(
                     if (fileContent.isEmpty()) {
                         return@forEach
                     }
-                    val rule = Rules.decodeFromString(xmlParser, fileContent)
-                    val activities = rule.activity.componentFilter
-                        .map { getComponentFromName(it.name) }
-                    val broadcast = rule.broadcast.componentFilter
-                        .map { getComponentFromName(it.name) }
-                    val service = rule.service.componentFilter
-                        .map { getComponentFromName(it.name) }
-                    // Assume that all components in the same file belong to the same package
+                    val rules = deserializer.deserialize(fileContent)
+                    val activities = rules.componentFiltersFor(IfwComponentType.ACTIVITY)
+                        .map { getComponentFromName(it) }
+                    val broadcast = rules.componentFiltersFor(IfwComponentType.BROADCAST)
+                        .map { getComponentFromName(it) }
+                    val service = rules.componentFiltersFor(IfwComponentType.SERVICE)
+                        .map { getComponentFromName(it) }
                     val packageName = activities.firstOrNull()?.packageName
                         ?: broadcast.firstOrNull()?.packageName
                         ?: service.firstOrNull()?.packageName
                         ?: return@forEach
                     val isSystemApp =
-                        ApplicationUtil.isSystemApp(context.packageManager, packageName)
+                        packageInfoDataSource.isSystemApp(packageName)
                     if (!shouldRestoreSystemApps && isSystemApp) {
                         Timber.i("Skipping system app $packageName")
                         return@forEach

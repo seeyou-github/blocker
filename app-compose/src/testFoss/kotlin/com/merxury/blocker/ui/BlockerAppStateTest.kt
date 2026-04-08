@@ -17,25 +17,20 @@
 
 package com.merxury.blocker.ui
 
-import androidx.compose.material.navigation.rememberBottomSheetNavigator
-import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
-import androidx.compose.material3.windowsizeclass.WindowSizeClass
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
-import androidx.navigation.NavHostController
-import androidx.navigation.compose.ComposeNavigator
-import androidx.navigation.compose.composable
-import androidx.navigation.createGraph
-import androidx.navigation.testing.TestNavHostController
+import androidx.navigation3.runtime.NavBackStack
 import com.merxury.blocker.core.data.util.PermissionStatus.NO_PERMISSION
+import com.merxury.blocker.core.navigation.NavigationState
+import com.merxury.blocker.core.navigation.Navigator
 import com.merxury.blocker.core.testing.util.TestNetworkMonitor
 import com.merxury.blocker.core.testing.util.TestPermissionMonitor
 import com.merxury.blocker.core.testing.util.TestTimeZoneMonitor
+import com.merxury.blocker.feature.applist.api.navigation.AppListNavKey
+import com.merxury.blocker.feature.debloator.api.navigation.DebloaterNavKey
+import com.merxury.blocker.feature.generalrule.api.navigation.GeneralRuleNavKey
+import com.merxury.blocker.feature.globalifwrule.api.navigation.GlobalIfwRuleNavKey
+import com.merxury.blocker.feature.search.api.navigation.SearchNavKey
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.android.testing.HiltTestApplication
 import kotlinx.coroutines.flow.collect
@@ -49,7 +44,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 /**
  * Tests [BlockerAppState].
@@ -72,64 +66,80 @@ class BlockerAppStateTest {
     // Subject under test.
     private lateinit var state: BlockerAppState
 
+    private fun testNavigationState() = NavigationState(
+        startKey = AppListNavKey(),
+        topLevelStack = NavBackStack(AppListNavKey()),
+        subStacks = mapOf(
+            AppListNavKey() to NavBackStack(AppListNavKey()),
+            GeneralRuleNavKey() to NavBackStack(GeneralRuleNavKey()),
+            DebloaterNavKey to NavBackStack(DebloaterNavKey),
+            GlobalIfwRuleNavKey to NavBackStack(GlobalIfwRuleNavKey),
+            SearchNavKey() to NavBackStack(SearchNavKey()),
+        ),
+    )
+
     @Test
     fun blockerAppState_currentDestination() = runTest {
-        var currentDestination: String? = null
+        val navigationState = testNavigationState()
+        val navigator = Navigator(navigationState)
 
         composeTestRule.setContent {
-            val bottomSheetNavigator = rememberBottomSheetNavigator()
-            val navController = rememberTestNavController()
-            state = remember(navController) {
+            state = remember(navigationState) {
                 return@remember BlockerAppState(
-                    bottomSheetNavigator = bottomSheetNavigator,
-                    navController = navController,
                     networkMonitor = networkMonitor,
                     permissionMonitor = permissionMonitor,
                     coroutineScope = backgroundScope,
                     timeZoneMonitor = timeZoneMonitor,
+                    navigationState = navigationState,
                 )
-            }
-
-            // Update currentDestination whenever it changes
-            currentDestination = state.currentDestination?.route
-
-            // Navigate to destination b once
-            LaunchedEffect(Unit) {
-                navController.setCurrentDestination("b")
             }
         }
 
-        assertEquals("b", currentDestination)
+        assertEquals(AppListNavKey(), state.navigationState.currentTopLevelKey)
+        assertEquals(AppListNavKey(), state.navigationState.currentKey)
+
+        // Navigate to another destination once
+        navigator.navigate(GeneralRuleNavKey())
+
+        composeTestRule.waitForIdle()
+
+        assertEquals(GeneralRuleNavKey(), state.navigationState.currentTopLevelKey)
+        assertEquals(GeneralRuleNavKey(), state.navigationState.currentKey)
     }
 
     @Test
     fun blockerAppState_destinations() = runTest {
         composeTestRule.setContent {
             state = rememberBlockerAppState(
-                windowSizeClass = getCompactWindowClass(),
                 networkMonitor = networkMonitor,
                 permissionMonitor = permissionMonitor,
                 timeZoneMonitor = timeZoneMonitor,
             )
         }
+        val navigationState = state.navigationState
 
-        assertEquals(3, state.topLevelDestinations.size)
-        assertTrue(state.topLevelDestinations[0].name.contains("APP", true))
-        assertTrue(state.topLevelDestinations[1].name.contains("RULE", true))
-        assertTrue(state.topLevelDestinations[2].name.contains("SEARCH", true))
+        assertEquals(5, navigationState.topLevelKeys.size)
+        assertEquals(
+            setOf(
+                AppListNavKey(),
+                GeneralRuleNavKey(),
+                DebloaterNavKey,
+                GlobalIfwRuleNavKey,
+                SearchNavKey(),
+            ),
+            navigationState.topLevelKeys,
+        )
     }
 
     @Test
     fun blockerAppState_WhenNetworkMonitorIsOffline_StateIsOffline() = runTest(UnconfinedTestDispatcher()) {
         composeTestRule.setContent {
-            val bottomSheetNavigator = rememberBottomSheetNavigator()
             state = BlockerAppState(
-                bottomSheetNavigator = bottomSheetNavigator,
-                navController = NavHostController(LocalContext.current),
                 networkMonitor = networkMonitor,
                 permissionMonitor = permissionMonitor,
                 coroutineScope = backgroundScope,
                 timeZoneMonitor = timeZoneMonitor,
+                navigationState = testNavigationState(),
             )
         }
 
@@ -144,14 +154,12 @@ class BlockerAppStateTest {
     @Test
     fun blockerAppState_WhenPermissionMonitorCantGetPermission_StateIsNoPermission() = runTest(UnconfinedTestDispatcher()) {
         composeTestRule.setContent {
-            val bottomSheetNavigator = rememberBottomSheetNavigator()
             state = BlockerAppState(
-                bottomSheetNavigator = bottomSheetNavigator,
-                navController = NavHostController(LocalContext.current),
                 networkMonitor = networkMonitor,
                 permissionMonitor = permissionMonitor,
                 coroutineScope = backgroundScope,
                 timeZoneMonitor = timeZoneMonitor,
+                navigationState = testNavigationState(),
             )
         }
 
@@ -167,12 +175,11 @@ class BlockerAppStateTest {
     fun blockerAppState_differentTZ_withTimeZoneMonitorChange() = runTest(UnconfinedTestDispatcher()) {
         composeTestRule.setContent {
             state = BlockerAppState(
-                bottomSheetNavigator = rememberBottomSheetNavigator(),
-                navController = NavHostController(LocalContext.current),
                 coroutineScope = backgroundScope,
                 networkMonitor = networkMonitor,
                 permissionMonitor = permissionMonitor,
                 timeZoneMonitor = timeZoneMonitor,
+                navigationState = testNavigationState(),
             )
         }
         val changedTz = TimeZone.of("Europe/Prague")
@@ -182,23 +189,5 @@ class BlockerAppStateTest {
             changedTz,
             state.currentTimeZone.value,
         )
-    }
-
-    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
-    private fun getCompactWindowClass() = WindowSizeClass.calculateFromSize(DpSize(500.dp, 300.dp))
-}
-
-@Composable
-private fun rememberTestNavController(): TestNavHostController {
-    val context = LocalContext.current
-    return remember {
-        TestNavHostController(context).apply {
-            navigatorProvider.addNavigator(ComposeNavigator())
-            graph = createGraph(startDestination = "a") {
-                composable("a") { }
-                composable("b") { }
-                composable("c") { }
-            }
-        }
     }
 }

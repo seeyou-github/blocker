@@ -42,8 +42,9 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
+          ref: ${{ github.head_ref }}
           submodules: 'true'
           fetch-depth: 0
 
@@ -79,14 +80,14 @@ jobs:
       - name: Copy CI gradle.properties
         run: mkdir -p ~/.gradle ; cp .github/ci-gradle.properties ~/.gradle/gradle.properties
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
-          java-version: 17
+          java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
@@ -97,7 +98,7 @@ jobs:
         run: ./gradlew :build-logic:convention:check
 
       - name: Check spotless
-        run: ./gradlew spotlessCheck --init-script gradle/init.gradle.kts --no-configuration-cache
+        run: ./gradlew spotlessCheck --no-configuration-cache
 
       - name: Check Dependency Guard
         id: dependencyguard_verify
@@ -117,12 +118,36 @@ jobs:
         run: |
           ./gradlew dependencyGuardBaseline
       - name: Push new Dependency Guard baselines if available
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         if: steps.dependencyguard_baseline.outcome == 'success'
         with:
           file_pattern: '**/dependencies/*.txt'
           disable_globbing: true
           commit_message: "🤖 Updates baselines for Dependency Guard"
+
+      - name: Update Graphs
+        run: ./gradlew graphUpdate
+        continue-on-error: true
+
+      - name: Check Graphs
+        id: graphs_verify
+        continue-on-error: true
+        run: git add -- "**/README.md" && git diff --cached --quiet --exit-code -- "**/README.md"
+
+      - name: Prevent updating graphs if this is a fork
+        id: checkfork_graphs
+        continue-on-error: false
+        if: steps.graphs_verify.outcome == 'failure' && github.event.pull_request.head.repo.full_name != github.repository
+        run: |
+          echo "::error::Check Graphs failed, please update graphs with: ./gradlew graphUpdate" && exit 1
+
+      - name: Push new graphs if available
+        if: steps.graphs_verify.outcome == 'failure' && github.event_name == 'pull_request'
+        uses: stefanzweifel/git-auto-commit-action@v7
+        with:
+          file_pattern: '**/README.md'
+          disable_globbing: true
+          commit_message: "🤖 Updates graphs"
 
       - name: Run all local screenshot tests (Roborazzi)
         id: screenshotsverify
@@ -146,7 +171,7 @@ jobs:
           ./gradlew recordRoborazziFossDebug
 
       - name: Push new screenshots if available
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         if: steps.screenshotsrecord.outcome == 'success'
         with:
           file_pattern: '*/*.png'
@@ -159,31 +184,31 @@ jobs:
         run: ./gradlew testFossDebug :lint:test
 
       - name: Build all build type and flavor permutations
-        run: ./gradlew :app:assemble
+        run: ./gradlew :app-compose:assemble -PminifyWithR8=false
 
       - name: Upload Foss apk
         if: success() && github.event_name != 'pull_request' && github.repository == 'lihenggui/Blocker'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Foss-APK
           path: ${{ github.workspace }}/app-compose/build/outputs/apk/foss/release
 
       - name: Upload Market apk
         if: success() && github.event_name != 'pull_request' && github.repository == 'lihenggui/Blocker'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: Market-APK
           path: ${{ github.workspace }}/app-compose/build/outputs/apk/market/release
 
       - name: Upload build outputs (APKs)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: APKs
           path: '**/build/outputs/apk/**/*.apk'
 
       - name: Upload mappings
         if: success() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mappings
           path: "app-compose/build/outputs/mapping/marketRelease"
@@ -205,7 +230,7 @@ jobs:
 
       - name: Upload JVM local results (XML)
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: local-test-results
           path: '**/build/test-results/test*UnitTest/**.xml'
@@ -215,16 +240,24 @@ jobs:
 
       - name: Upload lint reports (HTML)
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lint-reports
           path: '**/build/reports/lint-results-*.html'
 
-      - name: Upload lint reports (SARIF)
-        if: ${{ !cancelled() && hashFiles('**/*.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload lint reports (SARIF) for app module
+        if: ${{ !cancelled() && hashFiles('app-compose/**/*.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: './'
+          sarif_file: './app-compose/'
+          category: app-compose
+
+      - name: Upload lint reports (SARIF) for lint module
+        if: ${{ !cancelled() && hashFiles('lint/**/*.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: './lint/'
+          category: lint
 
       - name: Check badging
         id: check_badging
@@ -245,7 +278,7 @@ jobs:
           ./gradlew updateMarketReleaseBadging
 
       - name: Push new badging if available
-        uses: stefanzweifel/git-auto-commit-action@v5
+        uses: stefanzweifel/git-auto-commit-action@v7
         if: steps.update_badging.outcome == 'success'
         with:
           file_pattern: '*/*-badging.txt'
@@ -272,8 +305,9 @@ jobs:
           large-packages: false # includes google-cloud-sdk and it's slow
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
+          ref: ${{ github.head_ref }}
           submodules: 'true'
           fetch-depth: 0
 
@@ -287,20 +321,20 @@ jobs:
       - name: Copy CI gradle.properties
         run: mkdir -p ~/.gradle ; cp .github/ci-gradle.properties ~/.gradle/gradle.properties
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
-          java-version: 17
+          java-version: 21
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
 
       # Cache AVD. See https://github.com/ReactiveCircus/android-emulator-runner
       - name: AVD cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         id: avdcache
         with:
           path: |
@@ -344,7 +378,7 @@ jobs:
 
       - name: Upload test reports
         if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-reports-${{ matrix.api-level }}
           path: '**/build/reports/androidTests'
@@ -352,7 +386,7 @@ jobs:
       - name: Display local test coverage (only API 30)
         if: matrix.api-level == 30
         id: jacoco
-        uses: madrapps/jacoco-report@v1.7.1
+        uses: madrapps/jacoco-report@v1.7.2
         with:
           title: Combined test coverage report
           min-coverage-overall: 40
@@ -363,7 +397,7 @@ jobs:
 
       - name: Upload local coverage reports (XML + HTML) (only API 30)
         if: matrix.api-level == 30
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-reports
           if-no-files-found: error

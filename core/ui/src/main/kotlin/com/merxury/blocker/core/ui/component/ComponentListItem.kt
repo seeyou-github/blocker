@@ -73,11 +73,12 @@ fun ComponentListItem(
     type: ComponentType,
     isServiceRunning: Boolean,
     modifier: Modifier = Modifier,
-    navigateToComponentDetail: (String) -> Unit = { },
+    showComponentDetailDialog: (Boolean, String) -> Unit = { _, _ -> },
     onStopServiceClick: () -> Unit = { },
     onLaunchActivityClick: () -> Unit = { },
     onCopyNameClick: () -> Unit = { },
     onCopyFullNameClick: () -> Unit = { },
+    onEditIfwRuleClick: () -> Unit = { },
     onSwitchClick: (ComponentInfo, Boolean) -> Unit = { _, _ -> },
     isSelected: Boolean = false,
     isSelectedMode: Boolean = false,
@@ -99,7 +100,7 @@ fun ComponentListItem(
             .combinedClickable(
                 onClick = {
                     if (!isSelectedMode) {
-                        navigateToComponentDetail(item.name)
+                        showComponentDetailDialog(true, item.name)
                     } else {
                         if (isSelected) {
                             onDeselect(item)
@@ -179,6 +180,7 @@ fun ComponentListItem(
             onLaunchActivityClick = onLaunchActivityClick,
             onCopyNameClick = onCopyNameClick,
             onCopyPackageNameClick = onCopyFullNameClick,
+            onEditIfwRuleClick = onEditIfwRuleClick,
             onDismissRequest = { expanded = false },
         )
     }

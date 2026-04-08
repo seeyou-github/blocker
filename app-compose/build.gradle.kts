@@ -23,10 +23,12 @@ plugins {
     alias(libs.plugins.blocker.android.application.jacoco)
     alias(libs.plugins.blocker.android.hilt)
     alias(libs.plugins.blocker.android.application.firebase)
+    alias(libs.plugins.blocker.flashable.apk)
     alias(libs.plugins.ksp)
     id("kotlin-parcelize")
     alias(libs.plugins.baselineprofile)
     alias(libs.plugins.roborazzi)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -53,7 +55,8 @@ android {
             applicationIdSuffix = BlockerBuildType.DEBUG.applicationIdSuffix
         }
         getByName("release") {
-            isMinifyEnabled = true
+            isMinifyEnabled = providers.gradleProperty("minifyWithR8")
+                .map(String::toBooleanStrict).getOrElse(true)
             applicationIdSuffix = BlockerBuildType.RELEASE.applicationIdSuffix
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -81,30 +84,38 @@ android {
             excludes.add("/META-INF/{AL2.0,LGPL2.1}")
         }
     }
-    testOptions {
-        unitTests {
-            isIncludeAndroidResources = true
-        }
-    }
+    testOptions.unitTests.isIncludeAndroidResources = true
     ksp {
         arg("room.schemaLocation", "$projectDir/schemas")
     }
 }
 
 dependencies {
-    implementation(projects.feature.appdetail)
-    implementation(projects.feature.applist)
-    implementation(projects.feature.generalrule)
-    implementation(projects.feature.ruledetail)
-    implementation(projects.feature.search)
-    implementation(projects.feature.settings)
-    implementation(projects.feature.sort)
+    implementation(projects.feature.appdetail.api)
+    implementation(projects.feature.appdetail.impl)
+    implementation(projects.feature.applist.api)
+    implementation(projects.feature.applist.impl)
+    implementation(projects.feature.debloater.api)
+    implementation(projects.feature.debloater.impl)
+    implementation(projects.feature.generalrule.api)
+    implementation(projects.feature.generalrule.impl)
+    implementation(projects.feature.globalifwrule.api)
+    implementation(projects.feature.globalifwrule.impl)
+    implementation(projects.feature.ifwrule.api)
+    implementation(projects.feature.ifwrule.impl)
+    implementation(projects.feature.ruledetail.api)
+    implementation(projects.feature.ruledetail.impl)
+    implementation(projects.feature.search.api)
+    implementation(projects.feature.search.impl)
+    implementation(projects.feature.settings.api)
+    implementation(projects.feature.settings.impl)
 
     implementation(projects.core.analytics)
     implementation(projects.core.common)
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
     implementation(projects.core.model)
+    implementation(projects.core.navigation)
     implementation(projects.core.network)
     implementation(projects.core.provider)
     implementation(projects.core.rule)
@@ -112,9 +123,12 @@ dependencies {
     implementation(projects.sync.work)
 
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.compose.material3.adaptive)
     implementation(libs.androidx.compose.material3.adaptive.layout)
     implementation(libs.androidx.compose.material3.adaptive.navigation)
+    implementation(libs.androidx.compose.material3.adaptive.navigation3)
     implementation(libs.androidx.compose.material3.windowSizeClass)
     implementation(libs.androidx.compose.runtime.tracing)
     implementation(libs.androidx.compose.animation)
@@ -122,8 +136,8 @@ dependencies {
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.androidx.tracing.ktx)
     implementation(libs.androidx.compose.animation)
-    implementation(libs.androidx.compose.material.navigation)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.lifecycle.viewModel.navigation3)
     implementation(libs.androidx.lifecycle.runtimeCompose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.window.core)
@@ -135,6 +149,7 @@ dependencies {
     implementation(libs.hiddenapibypass)
     implementation(libs.kotlinx.coroutines.guava)
     implementation(libs.kotlinx.datetime)
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.libsu.core)
     implementation(libs.timber)
 
